@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Autoanálise e Projeção de Carreira</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  :root{
+    --surface:#fcfcfb; --page:#f4f3f0; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --line:#e1e0d9; --border:rgba(11,11,11,.10);
+    --blue:#2a78d6; --orange:#eb6834;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--page); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:28px 20px 80px;}
+  .wrap-narrow{max-width:840px;}
+  h1{font-family:Georgia,"Times New Roman",serif; font-weight:700; font-size:26px; margin:0; letter-spacing:-.01em;}
+  h2{font-family:Georgia,"Times New Roman",serif; font-size:18px; margin:0 0 4px;}
+  .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; flex-wrap:wrap; gap:12px;}
+  .topbar .sub{color:var(--ink-2); font-size:13px; margin-top:4px;}
+  .link-btn{font-size:13px; color:var(--ink-2); text-decoration:none; border:1px solid var(--border); padding:7px 14px; border-radius:8px; background:#fff; cursor:pointer; white-space:nowrap;}
+  .link-btn:hover{background:#f0f0ee;}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px; margin-bottom:20px; box-shadow:0 1px 2px rgba(11,11,11,.04);}
+  .card .desc{color:var(--ink-2); font-size:13px; margin-bottom:18px;}
+  label{display:block; font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:6px;}
+  input[type=text], input[type=email], input[type=password], select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:14px; font-family:inherit; background:#fff; color:var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--blue); outline-offset:1px;}
+  textarea{min-height:80px; resize:vertical;}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;}
+  @media (max-width:560px){ .row{grid-template-columns:1fr;} }
+
+  .btn-primary{background:var(--ink); color:#fff; border:none; padding:13px 26px; border-radius:11px; font-size:15px; font-weight:600; cursor:pointer;}
+  .btn-primary:disabled{opacity:.45; cursor:not-allowed;}
+  .btn-secondary{background:#fff; color:var(--ink); border:1px solid var(--line); padding:11px 20px; border-radius:11px; font-size:14px; font-weight:600; cursor:pointer;}
+  .error-msg{color:#b3261e; font-size:13px; margin-top:10px; display:none;}
+  .ok-msg{color:var(--good); font-size:13px; margin-top:10px; display:none;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th, td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  th{color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;}
+
+  /* ---------- HOME ---------- */
+  #screenHome{display:flex; align-items:center; justify-content:center; min-height:80vh;}
+  #screenHome .box{max-width:460px; padding:20px; text-align:center;}
+  #screenHome h1{font-size:26px; margin-bottom:8px;}
+  #screenHome p{color:var(--ink-2); font-size:14px; margin-bottom:28px;}
+  #screenHome .links{display:flex; flex-direction:column; gap:12px;}
+  #screenHome a{display:block; padding:16px; border-radius:12px; text-decoration:none; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--ink); transition:box-shadow .12s ease; cursor:pointer;}
+  #screenHome a:hover{box-shadow:0 4px 14px rgba(11,11,11,.08);}
+  #screenHome a small{display:block; font-weight:400; color:var(--muted); margin-top:3px;}
+
+  /* ---------- AUTOANÁLISE (TIME) ---------- */
+  .ponto-item{padding:14px 0; border-bottom:1px solid var(--line);}
+  .ponto-item:last-child{border-bottom:none;}
+  .ponto-item .titulo{font-size:14px; font-weight:600; margin-bottom:10px;}
+  .quad-choices{display:flex; gap:8px; flex-wrap:wrap;}
+  .quad-btn{flex:1; min-width:110px; padding:9px 10px; text-align:center; border-radius:9px; border:1px solid var(--line); background:#fff; color:var(--ink-2); font-size:13px; cursor:pointer; transition:all .12s ease; user-select:none;}
+  .quad-btn:hover{border-color:var(--blue);}
+  .quad-btn.active{background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600;}
+
+  .comp-item{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line);}
+  .comp-item:last-child{border-bottom:none;}
+  .comp-item .titulo{font-size:14px; font-weight:600;}
+  .nota-choices{display:flex; gap:6px;}
+  .nota-btn{width:38px; height:38px; border-radius:9px; border:1px solid var(--line); background:#fff; color:var(--ink-2); font-weight:700; cursor:pointer; transition:all .12s ease;}
+  .nota-btn:hover{border-color:var(--blue);}
+  .nota-btn.active{background:var(--blue); border-color:var(--blue); color:#fff;}
+
+  #resultado{display:none;}
+  .result-header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:20px; flex-wrap:wrap; gap:10px;}
+  .result-header h2{font-size:24px; margin:0;}
+  .result-header .cargo{color:var(--ink-2); font-size:14px; margin-top:2px;}
+  .result-header .meta{text-align:right; font-size:13px; color:var(--ink-2);}
+  .quad-label{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px;}
+  .quad-value{font-family:Georgia,serif; font-size:22px; font-weight:700;}
+  .radar-wrap{max-width:420px; margin:8px auto 20px;}
+  .media-line{font-size:14px; margin-top:12px; color:var(--ink-2);}
+  .media-line b{color:var(--ink);}
+  #stepSelector{display:flex; align-items:flex-end; gap:12px;}
+  #stepSelector > div{flex:1;}
+  @media (max-width:560px){ #stepSelector{flex-direction:column; align-items:stretch;} }
+
+  /* ---------- GESTORA ---------- */
+  #loginScreenBox{max-width:380px; margin:60px auto 0;}
+  #searchBox{margin-bottom:16px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px;}
+  .exec-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; cursor:pointer; transition:box-shadow .12s ease, transform .12s ease;}
+  .exec-card:hover{box-shadow:0 4px 14px rgba(11,11,11,.08); transform:translateY(-1px);}
+  .exec-card .nome{font-family:Georgia,serif; font-size:16px; font-weight:700;}
+  .exec-card .cargo{font-size:12.5px; color:var(--ink-2); margin-top:1px;}
+  .exec-card .meta-row{display:flex; justify-content:space-between; align-items:center; margin-top:12px;}
+  .badge{display:inline-block; padding:3px 9px; border-radius:99px; font-size:11px; font-weight:700; letter-spacing:.02em;}
+  .badge-quad{background:var(--blue); color:#fff;}
+  .badge-status-good{background:rgba(12,163,12,.12); color:#0a7a0a;}
+  .badge-status-warning{background:rgba(250,178,25,.18); color:#8a5b00;}
+  .badge-status-pending{background:#eee; color:var(--ink-2);}
+  .exec-card .media{font-size:12px; color:var(--muted);}
+  .empty-state{color:var(--muted); font-size:14px; padding:30px 0; text-align:center;}
+
+  #detailPanel{display:none;}
+  .detail-header{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px; margin-bottom:20px;}
+  .detail-header h2{font-size:24px;}
+  .detail-header .cargo{color:var(--ink-2); font-size:14px;}
+  .detail-actions{display:flex; gap:10px; flex-wrap:wrap;}
+  select#cycleSelect{width:auto; min-width:160px;}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+  @media (max-width:800px){ .two-col{grid-template-columns:1fr;} }
+  td select{padding:6px 8px; font-size:13px;}
+  .legend-row{display:flex; gap:16px; font-size:12.5px; color:var(--ink-2); margin:6px 0 14px;}
+  .legend-dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px;}
+  .chart-box{max-width:100%; margin:6px 0 10px;}
+  .section-title{font-family:Georgia,serif; font-size:16px; margin:26px 0 10px; padding-top:16px; border-top:1px solid var(--line);}
+  .row-2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:600px){ .row-2{grid-template-columns:1fr;} }
+  .quad-history{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
+  .quad-chip{font-size:11.5px; background:#f0f0ee; border-radius:8px; padding:4px 9px; color:var(--ink-2);}
+  .readonly-box{background:#f7f7f5; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:13.5px; color:var(--ink-2); white-space:pre-wrap;}
+  .save-msg{font-size:13px; color:var(--good); margin-top:10px; display:none;}
+</style>
+</head>
+<body>
+
+<!-- ================= HOME ================= -->
+<div id="screenHome">
+  <div class="box">
+    <h1>Painel de Autoanálise e Projeção de Carreira</h1>
+    <p>Escolha seu acesso</p>
+    <div class="links">
+      <a id="goTeam">Sou do time — preencher autoanálise
+        <small>Aberto para todo o time, sem login</small>
+      </a>
+      <a id="goManager">Sou gestora — ver progressão do time
+        <small>Acesso restrito com login</small>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ================= AUTOANÁLISE (TIME) ================= -->
+<div id="screenTeam" style="display:none;">
+<div class="wrap wrap-narrow">
+
+  <div class="topbar">
+    <div>
+      <h1>Painel de Autoanálise e Projeção de Carreira</h1>
+      <div class="sub">Preencha sua autoanálise a cada ciclo — sua gestora acompanha sua evolução por aqui.</div>
+    </div>
+    <button class="link-btn" id="teamGoHome">← Início</button>
+  </div>
+
+  <div class="card" id="formCard">
+    <h2>Seus dados</h2>
+    <div class="desc">Selecione seu nome na lista, ou digite se ainda não estiver cadastrado.</div>
+    <div id="stepSelector">
+      <div>
+        <label for="nomeInput">Nome completo</label>
+        <input type="text" id="nomeInput" list="nomesExistentes" placeholder="Digite ou selecione seu nome" autocomplete="off">
+        <datalist id="nomesExistentes"></datalist>
+      </div>
+      <div>
+        <label for="cargoInput">Cargo atual</label>
+        <input type="text" id="cargoInput" placeholder="ex: Analista Comercial Junior">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Autoanálise — Pontos Comportamentais</h2>
+    <div class="desc">Para cada ponto, escolha o quadrante que melhor representa você hoje (1 = em desenvolvimento inicial → 4 = referência).</div>
+    <div id="pontosList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Autoanálise — Mandala de Competências</h2>
+    <div class="desc">Dê uma nota de 1 a 3 para cada competência.</div>
+    <div id="competenciasList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Projeção de Crescimento Profissional</h2>
+    <div class="row" style="margin-bottom:0;">
+      <div style="grid-column:1/-1;">
+        <label for="objetivoInput">Objetivo para o próximo ciclo</label>
+        <input type="text" id="objetivoInput" placeholder="ex: Analista Pleno">
+      </div>
+    </div>
+    <label for="textoInput" style="margin-top:14px;">O que você acredita precisar desenvolver?</label>
+    <textarea id="textoInput" placeholder="Descreva livremente..."></textarea>
+  </div>
+
+  <div class="card">
+    <button class="btn-primary" id="btnEnviar" style="width:100%;">Enviar minha autoanálise</button>
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="ok-msg" id="okMsg">Autoanálise registrada com sucesso!</div>
+  </div>
+
+  <div class="card" id="resultado">
+    <div class="result-header">
+      <div>
+        <h2 id="rNome"></h2>
+        <div class="cargo" id="rCargo"></div>
+      </div>
+      <div class="meta">
+        Relatório de Autoanálise<br>
+        Data do preenchimento: <span id="rData"></span>
+      </div>
+    </div>
+    <div class="quad-label">Resultado — Autoanálise Comportamental</div>
+    <div class="quad-value" id="rQuadrante"></div>
+    <table style="margin-top:16px;">
+      <thead><tr><th>Ponto comportamental</th><th>Quadrante escolhido</th></tr></thead>
+      <tbody id="rPontosBody"></tbody>
+    </table>
+    <h2 style="margin-top:26px;">Autoanálise — Mandala de Competências</h2>
+    <div class="radar-wrap"><canvas id="radarChart"></canvas></div>
+    <table>
+      <thead><tr><th>Competência</th><th>Nota (1–3)</th></tr></thead>
+      <tbody id="rCompBody"></tbody>
+    </table>
+    <div class="media-line">Média geral da autoanálise: <b id="rMedia"></b>/3</div>
+    <div style="margin-top:24px; text-align:center;">
+      <button class="btn-secondary" id="btnPdf">Baixar meu resumo em PDF</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ================= GESTORA ================= -->
+<div id="screenManager" style="display:none;">
+<div class="wrap">
+
+  <!-- LOGIN -->
+  <div id="loginScreen">
+    <div class="topbar" style="margin-bottom:20px;">
+      <h1 style="font-size:22px;">Painel da Gestora</h1>
+      <button class="link-btn" id="loginGoHome">← Início</button>
+    </div>
+    <div id="loginScreenBox">
+      <div class="card">
+        <h2>Entrar</h2>
+        <div style="font-size:13px; color:var(--ink-2); margin-bottom:16px;">Acesso restrito à gestão do time.</div>
+        <label for="loginEmail">E-mail</label>
+        <input type="email" id="loginEmail" style="margin-bottom:14px;">
+        <label for="loginSenha">Senha</label>
+        <input type="password" id="loginSenha">
+        <button class="btn-primary" id="btnLogin" style="width:100%; margin-top:18px;">Entrar</button>
+        <div class="error-msg" id="loginError" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none;">
+    <div class="topbar">
+      <div>
+        <h1>Painel da Gestora</h1>
+        <div class="sub">Progressão individual do time — autoanálise x análise da gestora</div>
+      </div>
+      <div class="detail-actions">
+        <button class="link-btn" id="dashGoTeam">Quadro de autoanálise →</button>
+        <button class="link-btn" id="btnLogout">Sair</button>
+      </div>
+    </div>
+
+    <div id="teamView">
+      <input type="text" id="searchBox" placeholder="Buscar por nome ou cargo...">
+      <div class="grid" id="teamGrid"></div>
+      <div class="empty-state" id="emptyState" style="display:none;">Nenhum registro ainda. Assim que o time preencher a autoanálise, os cards aparecem aqui.</div>
+    </div>
+
+    <div id="detailPanel">
+      <button class="link-btn" id="btnVoltar" style="margin-bottom:16px;">← Voltar para o time</button>
+
+      <div class="card" id="pdfReport">
+        <div class="detail-header">
+          <div>
+            <h2 id="dNome"></h2>
+            <div class="cargo" id="dCargo"></div>
+            <div class="quad-history" id="dQuadHistory"></div>
+          </div>
+          <div class="detail-actions" data-html2canvas-ignore>
+            <select id="cycleSelect"></select>
+            <button class="btn-secondary" id="btnGerarPdf">Gerar PDF de evolução</button>
+          </div>
+        </div>
+
+        <div class="section-title">Progressão — média geral por ciclo</div>
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:#2a78d6;"></span>Autoanálise</span>
+          <span><span class="legend-dot" style="background:#eb6834;"></span>Análise da gestora</span>
+        </div>
+        <div class="chart-box"><canvas id="progressChart" height="90"></canvas></div>
+
+        <div class="section-title">Ciclo selecionado — comparação autoanálise x gestora</div>
+        <div class="two-col">
+          <div>
+            <div class="chart-box"><canvas id="radarCompareChart"></canvas></div>
+          </div>
+          <div>
+            <h2 style="font-size:14px;">Pontos comportamentais</h2>
+            <table>
+              <thead><tr><th>Ponto</th><th>Autoanálise</th><th>Gestora</th></tr></thead>
+              <tbody id="pontosCompareBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <table style="margin-top:16px;">
+          <thead><tr><th>Competência</th><th>Nota autoanálise</th><th>Nota gestora</th></tr></thead>
+          <tbody id="compCompareBody"></tbody>
+        </table>
+
+        <div class="row-2" style="margin-top:18px;">
+          <div>
+            <label>Objetivo do executivo para o próximo ciclo</label>
+            <div class="readonly-box" id="dObjetivo"></div>
+          </div>
+          <div>
+            <label>O que o executivo acredita precisar desenvolver</label>
+            <div class="readonly-box" id="dTexto"></div>
+          </div>
+        </div>
+
+        <div class="section-title">Análise da gestora — ciclo selecionado</div>
+        <div class="row-2">
+          <div>
+            <label for="mStatus">Status na progressão de carreira</label>
+            <select id="mStatus">
+              <option value="">Selecionar...</option>
+              <option value="Em desenvolvimento">Em desenvolvimento</option>
+              <option value="No caminho certo">No caminho certo</option>
+              <option value="Pronto para promoção">Pronto para promoção</option>
+              <option value="Atenção / plano de ação necessário">Atenção / plano de ação necessário</option>
+            </select>
+          </div>
+          <div>
+            <label for="mRecomendacao">Recomendação de próximo cargo</label>
+            <input type="text" id="mRecomendacao" placeholder="ex: Analista Pleno">
+          </div>
+        </div>
+        <div class="row-2" style="margin-top:14px;">
+          <div>
+            <label for="mPontosFortes">Pontos fortes observados</label>
+            <textarea id="mPontosFortes"></textarea>
+          </div>
+          <div>
+            <label for="mPontosDesenvolver">Pontos a desenvolver (visão da gestora)</label>
+            <textarea id="mPontosDesenvolver"></textarea>
+          </div>
+        </div>
+        <label for="mPlanoAcao" style="margin-top:14px;">Plano de ação</label>
+        <textarea id="mPlanoAcao"></textarea>
+
+        <div data-html2canvas-ignore>
+          <button class="btn-primary" id="btnSalvarAnalise" style="margin-top:16px;">Salvar análise da gestora</button>
+          <div class="save-msg" id="saveMsg">Análise salva com sucesso!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+/* ======================================================================
+   const SUPABASE_URL = "sb_publishable_80NRxK9eLvMZ3XA46Wve_A_stG7-XNm
+ ";
+const SUPABASE_ANON_KEY = "sb_secret_n6Nr5YTUqR4WEssdNSLvFg_Mdk3ATeQ";
+   ====================================================================== */
+const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+const SUPABASE_ANON_KEY = "SUA-CHAVE-PUBLICA-AQUI";
+/* ====================================================================== */
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const PONTOS = [
+  'Autonomia','Complexidade das entregas','Conhecimento técnico','Comunicação',
+  'Relacionamento com stakeholders','Trabalho em equipe','Adaptabilidade a mudanças',
+  'Proatividade','Inteligência emocional','Mentoria','Tomada de decisão','Visão de negócio'
+];
+const COMPETENCIAS = [
+  'Empatia','Autorresponsabilidade','Flexibilidade','Senso de Dono','Ética e Integridade',
+  'Gestão','Respeito à Diversidade','Compromisso Social e Ambiental','Foco na Solução',
+  'Motivação pelo que Faz','Comunicação Assertiva'
+];
+const COMPETENCIAS_LABEL_CURTO = {
+  'Empatia':'Empatia','Autorresponsabilidade':'Autorresp.','Flexibilidade':'Flexibilidade',
+  'Senso de Dono':'Senso de Dono','Ética e Integridade':'Ética/Integr.','Gestão':'Gestão',
+  'Respeito à Diversidade':'Resp. Diversidade','Compromisso Social e Ambiental':'Compr. Social/Amb.',
+  'Foco na Solução':'Foco na Solução','Motivação pelo que Faz':'Motivação','Comunicação Assertiva':'Comunicação'
+};
+
+/* ======================================================================
+   NAVEGAÇÃO ENTRE TELAS
+   ====================================================================== */
+function showScreen(name){
+  document.getElementById('screenHome').style.display = name==='home' ? 'flex' : 'none';
+  document.getElementById('screenTeam').style.display = name==='team' ? 'block' : 'none';
+  document.getElementById('screenManager').style.display = name==='manager' ? 'block' : 'none';
+  window.scrollTo(0,0);
+}
+document.getElementById('goTeam').addEventListener('click', ()=>{ showScreen('team'); loadExecutivesForDatalist(); });
+document.getElementById('goManager').addEventListener('click', ()=>{ showScreen('manager'); checkSession(); });
+document.getElementById('teamGoHome').addEventListener('click', ()=> showScreen('home'));
+document.getElementById('loginGoHome').addEventListener('click', ()=> showScreen('home'));
+document.getElementById('dashGoTeam').addEventListener('click', ()=>{ showScreen('team'); loadExecutivesForDatalist(); });
+
+/* ======================================================================
+   TELA DO TIME — AUTOANÁLISE
+   ====================================================================== */
+const state = { pontos:{}, competencias:{} };
+
+const pontosList = document.getElementById('pontosList');
+PONTOS.forEach(ponto=>{
+  const div = document.createElement('div');
+  div.className = 'ponto-item';
+  div.innerHTML = `
+    <div class="titulo">${ponto}</div>
+    <div class="quad-choices">
+      ${[1,2,3,4].map(q=>`<div class="quad-btn" data-ponto="${ponto}" data-q="${q}">Quadrante ${q}</div>`).join('')}
+    </div>`;
+  pontosList.appendChild(div);
+});
+pontosList.addEventListener('click', e=>{
+  const btn = e.target.closest('.quad-btn');
+  if(!btn) return;
+  const ponto = btn.dataset.ponto, q = Number(btn.dataset.q);
+  state.pontos[ponto] = q;
+  pontosList.querySelectorAll(`.quad-btn[data-ponto="${CSS.escape(ponto)}"]`).forEach(b=>b.classList.toggle('active', Number(b.dataset.q)===q));
+});
+
+const compList = document.getElementById('competenciasList');
+COMPETENCIAS.forEach(comp=>{
+  const div = document.createElement('div');
+  div.className = 'comp-item';
+  div.innerHTML = `
+    <div class="titulo">${comp}</div>
+    <div class="nota-choices">
+      ${[1,2,3].map(n=>`<div class="nota-btn" data-comp="${comp}" data-n="${n}">${n}</div>`).join('')}
+    </div>`;
+  compList.appendChild(div);
+});
+compList.addEventListener('click', e=>{
+  const btn = e.target.closest('.nota-btn');
+  if(!btn) return;
+  const comp = btn.dataset.comp, n = Number(btn.dataset.n);
+  state.competencias[comp] = n;
+  compList.querySelectorAll(`.nota-btn[data-comp="${CSS.escape(comp)}"]`).forEach(b=>b.classList.toggle('active', Number(b.dataset.n)===n));
+});
+
+let executivesCache = [];
+let datalistLoaded = false;
+async function loadExecutivesForDatalist(){
+  if(datalistLoaded) return;
+  const { data, error } = await sb.from('executives').select('id,nome,cargo_atual').order('nome');
+  if(!error && data){
+    executivesCache = data;
+    datalistLoaded = true;
+    const dl = document.getElementById('nomesExistentes');
+    dl.innerHTML = data.map(e=>`<option value="${e.nome.replace(/"/g,'&quot;')}"></option>`).join('');
+  }
+}
+document.getElementById('nomeInput').addEventListener('change', e=>{
+  const match = executivesCache.find(x=>x.nome.trim().toLowerCase() === e.target.value.trim().toLowerCase());
+  if(match && match.cargo_atual){ document.getElementById('cargoInput').value = match.cargo_atual; }
+});
+
+function calcQuadranteGeral(pontosVals){
+  const counts = {1:0,2:0,3:0,4:0};
+  pontosVals.forEach(v=>counts[v]++);
+  const max = Math.max(...Object.values(counts));
+  const top = Object.keys(counts).map(Number).filter(k=>counts[k]===max).sort((a,b)=>a-b);
+  if(top.length===1) return `Quadrante ${top[0]}`;
+  if(top.length===2) return `Entre Quadrante ${top[0]} e Quadrante ${top[1]}`;
+  return `Quadrante ${top[0]} (misto)`;
+}
+function currentCiclo(d = new Date()){
+  const q = Math.floor(d.getMonth()/3)+1;
+  return `${d.getFullYear()}-Q${q}`;
+}
+
+let radarChartInstance = null;
+
+document.getElementById('btnEnviar').addEventListener('click', async ()=>{
+  const errorEl = document.getElementById('errorMsg');
+  const okEl = document.getElementById('okMsg');
+  errorEl.style.display='none'; okEl.style.display='none';
+
+  const nome = document.getElementById('nomeInput').value.trim();
+  const cargo = document.getElementById('cargoInput').value.trim();
+  const objetivo = document.getElementById('objetivoInput').value.trim();
+  const texto = document.getElementById('textoInput').value.trim();
+
+  if(!nome){ errorEl.textContent='Informe seu nome completo.'; errorEl.style.display='block'; return; }
+  if(Object.keys(state.pontos).length < PONTOS.length){ errorEl.textContent='Responda todos os 12 pontos comportamentais.'; errorEl.style.display='block'; return; }
+  if(Object.keys(state.competencias).length < COMPETENCIAS.length){ errorEl.textContent='Dê nota para todas as 11 competências.'; errorEl.style.display='block'; return; }
+
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  try{
+    let execId;
+    const { data: existing } = await sb.from('executives').select('id').ilike('nome', nome).maybeSingle();
+    if(existing){
+      execId = existing.id;
+      if(cargo) await sb.from('executives').update({ cargo_atual: cargo }).eq('id', execId);
+    } else {
+      const { data: created, error: createErr } = await sb.from('executives').insert({ nome, cargo_atual: cargo || null }).select('id').single();
+      if(createErr) throw createErr;
+      execId = created.id;
+    }
+
+    const pontosVals = PONTOS.map(p=>state.pontos[p]);
+    const compVals = COMPETENCIAS.map(c=>state.competencias[c]);
+    const media = Math.round((compVals.reduce((a,b)=>a+b,0) / compVals.length) * 10) / 10;
+    const quadranteGeral = calcQuadranteGeral(pontosVals);
+    const hoje = new Date().toISOString().slice(0,10);
+
+    const { data: sa, error: saErr } = await sb.from('self_assessments').insert({
+      executive_id: execId,
+      ciclo: currentCiclo(),
+      data_preenchimento: hoje,
+      cargo_no_preenchimento: cargo || null,
+      quadrante_geral: quadranteGeral,
+      respondidos_pontos: PONTOS.length,
+      media_competencias: media,
+      objetivo_proximo_ciclo: objetivo || null,
+      o_que_precisa_desenvolver: texto || null
+    }).select('id').single();
+    if(saErr) throw saErr;
+
+    const pontosRows = PONTOS.map(p=>({ self_assessment_id: sa.id, ponto:p, quadrante: state.pontos[p] }));
+    const compRows = COMPETENCIAS.map(c=>({ self_assessment_id: sa.id, competencia:c, nota: state.competencias[c] }));
+    const [{error:pErr}, {error:cErr}] = await Promise.all([
+      sb.from('self_assessment_pontos').insert(pontosRows),
+      sb.from('self_assessment_competencias').insert(compRows)
+    ]);
+    if(pErr) throw pErr;
+    if(cErr) throw cErr;
+
+    okEl.style.display='block';
+    document.getElementById('formCard').scrollIntoView({behavior:'smooth'});
+
+    document.getElementById('rNome').textContent = nome;
+    document.getElementById('rCargo').textContent = cargo;
+    document.getElementById('rData').textContent = new Date().toLocaleDateString('pt-BR');
+    document.getElementById('rQuadrante').textContent = quadranteGeral;
+    document.getElementById('rPontosBody').innerHTML = PONTOS.map(p=>`<tr><td>${p}</td><td>Quadrante ${state.pontos[p]}</td></tr>`).join('');
+    document.getElementById('rCompBody').innerHTML = COMPETENCIAS.map(c=>`<tr><td>${c}</td><td>${state.competencias[c]}</td></tr>`).join('');
+    document.getElementById('rMedia').textContent = media.toFixed(1);
+
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    if(radarChartInstance) radarChartInstance.destroy();
+    radarChartInstance = new Chart(ctx, {
+      type:'radar',
+      data:{
+        labels: COMPETENCIAS.map(c=>COMPETENCIAS_LABEL_CURTO[c]),
+        datasets:[{
+          label:'Autoanálise', data: compVals,
+          borderColor:'#2a78d6', backgroundColor:'rgba(42,120,214,0.15)',
+          pointBackgroundColor:'#2a78d6', borderWidth:2
+        }]
+      },
+      options:{
+        scales:{ r:{ min:0, max:3, ticks:{ stepSize:1, backdropColor:'transparent' }, pointLabels:{ font:{size:10} } } },
+        plugins:{ legend:{ display:false } }
+      }
+    });
+
+    document.getElementById('resultado').style.display='block';
+    document.getElementById('resultado').scrollIntoView({behavior:'smooth'});
+  } catch(err){
+    console.error(err);
+    errorEl.textContent = 'Não foi possível enviar sua autoanálise. Tente novamente em instantes. (' + (err.message||'') + ')';
+    errorEl.style.display='block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enviar minha autoanálise';
+  }
+});
+
+document.getElementById('btnPdf').addEventListener('click', async ()=>{
+  const el = document.getElementById('resultado');
+  const canvas = await html2canvas(el, { scale:2, backgroundColor:'#fcfcfb' });
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','mm','a4');
+  const pageW = pdf.internal.pageSize.getWidth();
+  const imgW = pageW - 20;
+  const imgH = canvas.height * imgW / canvas.width;
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, imgH);
+  const nome = document.getElementById('rNome').textContent || 'autoanalise';
+  pdf.save(`Autoanalise_${nome.replace(/\s+/g,'_')}.pdf`);
+});
+
+/* ======================================================================
+   TELA DA GESTORA
+   ====================================================================== */
+let currentUser = null;
+let teamData = [];
+let activeExec = null;
+let progressChart, radarChart;
+
+async function checkSession(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){ currentUser = session.user; showManagerDashboard(); }
+  else { showManagerLogin(); }
+}
+function showManagerLogin(){
+  document.getElementById('loginScreen').style.display='block';
+  document.getElementById('dashboard').style.display='none';
+}
+function showManagerDashboard(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  loadTeam();
+}
+document.getElementById('btnLogin').addEventListener('click', async ()=>{
+  const email = document.getElementById('loginEmail').value.trim();
+  const senha = document.getElementById('loginSenha').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display='none';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
+  if(error){ errEl.textContent = 'E-mail ou senha inválidos.'; errEl.style.display='block'; return; }
+  currentUser = data.user;
+  showManagerDashboard();
+});
+document.getElementById('btnLogout').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+  showManagerLogin();
+});
+
+async function loadTeam(){
+  const { data: execs, error: execErr } = await sb.from('executives').select('*').order('nome');
+  if(execErr){ console.error(execErr); return; }
+
+  const { data: assessments } = await sb
+    .from('self_assessments')
+    .select('*, self_assessment_pontos(*), self_assessment_competencias(*)')
+    .order('data_preenchimento', { ascending:true });
+
+  const { data: managerAssessments } = await sb
+    .from('manager_assessments')
+    .select('*, manager_assessment_competencias(*), manager_assessment_pontos(*)')
+    .order('data_avaliacao', { ascending:true });
+
+  teamData = execs.map(ex=>({
+    executive: ex,
+    assessments: (assessments||[]).filter(a=>a.executive_id===ex.id),
+    managerAssessments: (managerAssessments||[]).filter(m=>m.executive_id===ex.id)
+  }));
+
+  renderTeamGrid();
+}
+
+function renderTeamGrid(filterText=''){
+  const grid = document.getElementById('teamGrid');
+  const empty = document.getElementById('emptyState');
+  const filtered = teamData.filter(t=>{
+    const q = filterText.toLowerCase();
+    return t.executive.nome.toLowerCase().includes(q) || (t.executive.cargo_atual||'').toLowerCase().includes(q);
+  });
+
+  if(filtered.length===0){ grid.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  grid.innerHTML = filtered.map(t=>{
+    const last = t.assessments[t.assessments.length-1];
+    const lastManager = t.managerAssessments[t.managerAssessments.length-1];
+    const jaAnalisado = last && lastManager && lastManager.self_assessment_id === last.id;
+    let statusBadge = '<span class="badge badge-status-pending">Sem autoanálise</span>';
+    if(last){
+      statusBadge = jaAnalisado
+        ? '<span class="badge badge-status-good">Analisado pela gestora</span>'
+        : '<span class="badge badge-status-warning">Aguardando análise</span>';
+    }
+    return `
+      <div class="exec-card" data-id="${t.executive.id}">
+        <div class="nome">${t.executive.nome}</div>
+        <div class="cargo">${t.executive.cargo_atual || '—'}</div>
+        <div class="meta-row">
+          ${last ? `<span class="badge badge-quad">${last.quadrante_geral}</span>` : '<span></span>'}
+          ${statusBadge}
+        </div>
+        <div class="media" style="margin-top:8px;">
+          ${last ? `Média: <b>${Number(last.media_competencias).toFixed(1)}</b>/3 · último preenchimento ${formatDate(last.data_preenchimento)}` : 'Ainda não preencheu'}
+        </div>
+      </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.exec-card').forEach(card=>{
+    card.addEventListener('click', ()=> openDetail(card.dataset.id));
+  });
+}
+
+document.getElementById('searchBox').addEventListener('input', e=>renderTeamGrid(e.target.value));
+
+function formatDate(d){
+  if(!d) return '';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function openDetail(execId){
+  activeExec = teamData.find(t=>t.executive.id===execId);
+  if(!activeExec) return;
+  document.getElementById('teamView').style.display='none';
+  document.getElementById('detailPanel').style.display='block';
+
+  document.getElementById('dNome').textContent = activeExec.executive.nome;
+  document.getElementById('dCargo').textContent = activeExec.executive.cargo_atual || '—';
+  document.getElementById('dQuadHistory').innerHTML = activeExec.assessments
+    .map(a=>`<span class="quad-chip">${a.ciclo}: ${a.quadrante_geral}</span>`).join('');
+
+  const sel = document.getElementById('cycleSelect');
+  sel.innerHTML = activeExec.assessments.map(a=>`<option value="${a.id}">${a.ciclo} — ${formatDate(a.data_preenchimento)}</option>`).join('');
+  sel.value = activeExec.assessments.length ? activeExec.assessments[activeExec.assessments.length-1].id : '';
+
+  renderProgressChart();
+  if(activeExec.assessments.length) renderCycle(sel.value);
+  else clearCycleView();
+}
+
+document.getElementById('btnVoltar').addEventListener('click', ()=>{
+  document.getElementById('teamView').style.display='block';
+  document.getElementById('detailPanel').style.display='none';
+});
+document.getElementById('cycleSelect').addEventListener('change', e=> renderCycle(e.target.value));
+
+function findManagerFor(selfAssessmentId){
+  return activeExec.managerAssessments.find(m=>m.self_assessment_id===selfAssessmentId);
+}
+
+function renderProgressChart(){
+  const ctx = document.getElementById('progressChart').getContext('2d');
+  const labels = activeExec.assessments.map(a=>a.ciclo);
+  const autoData = activeExec.assessments.map(a=>a.media_competencias);
+  const gestoraData = activeExec.assessments.map(a=>{
+    const m = findManagerFor(a.id);
+    if(!m || !m.manager_assessment_competencias.length) return null;
+    const vals = m.manager_assessment_competencias.map(c=>c.nota);
+    return Math.round((vals.reduce((x,y)=>x+y,0)/vals.length)*10)/10;
+  });
+
+  if(progressChart) progressChart.destroy();
+  progressChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        { label:'Autoanálise', data:autoData, borderColor:'#2a78d6', backgroundColor:'#2a78d6', tension:.25, spanGaps:true, pointRadius:4 },
+        { label:'Gestora', data:gestoraData, borderColor:'#eb6834', backgroundColor:'#eb6834', tension:.25, spanGaps:true, pointRadius:4 }
+      ]
+    },
+    options:{
+      plugins:{ legend:{ display:false } },
+      scales:{ y:{ min:0, max:3, ticks:{ stepSize:1 } } }
+    }
+  });
+}
+
+function clearCycleView(){
+  document.getElementById('pontosCompareBody').innerHTML = '';
+  document.getElementById('compCompareBody').innerHTML = '';
+  document.getElementById('dObjetivo').textContent = '—';
+  document.getElementById('dTexto').textContent = '—';
+  if(radarChart) radarChart.destroy();
+}
+
+function renderCycle(selfAssessmentId){
+  const sa = activeExec.assessments.find(a=>a.id===selfAssessmentId);
+  if(!sa) return clearCycleView();
+  const ma = findManagerFor(sa.id);
+
+  document.getElementById('dObjetivo').textContent = sa.objetivo_proximo_ciclo || '—';
+  document.getElementById('dTexto').textContent = sa.o_que_precisa_desenvolver || '—';
+
+  const pontosAuto = {}; sa.self_assessment_pontos.forEach(p=>pontosAuto[p.ponto]=p.quadrante);
+  const pontosGestora = {}; if(ma) ma.manager_assessment_pontos.forEach(p=>pontosGestora[p.ponto]=p.quadrante);
+  document.getElementById('pontosCompareBody').innerHTML = PONTOS.map(p=>`
+    <tr>
+      <td>${p}</td>
+      <td>Quadrante ${pontosAuto[p] ?? '—'}</td>
+      <td>
+        <select data-ponto="${p}" class="gestora-ponto-select">
+          <option value="">—</option>
+          ${[1,2,3,4].map(q=>`<option value="${q}" ${pontosGestora[p]===q?'selected':''}>Quadrante ${q}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('');
+
+  const compAuto = {}; sa.self_assessment_competencias.forEach(c=>compAuto[c.competencia]=c.nota);
+  const compGestora = {}; if(ma) ma.manager_assessment_competencias.forEach(c=>compGestora[c.competencia]=c.nota);
+  document.getElementById('compCompareBody').innerHTML = COMPETENCIAS.map(c=>`
+    <tr>
+      <td>${c}</td>
+      <td>${compAuto[c] ?? '—'}</td>
+      <td>
+        <select data-comp="${c}" class="gestora-comp-select">
+          <option value="">—</option>
+          ${[1,2,3].map(n=>`<option value="${n}" ${compGestora[c]===n?'selected':''}>${n}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('');
+
+  const ctx = document.getElementById('radarCompareChart').getContext('2d');
+  if(radarChart) radarChart.destroy();
+  const datasets = [{
+    label:'Autoanálise',
+    data: COMPETENCIAS.map(c=>compAuto[c] ?? 0),
+    borderColor:'#2a78d6', backgroundColor:'rgba(42,120,214,0.15)', pointBackgroundColor:'#2a78d6', borderWidth:2
+  }];
+  if(ma){
+    datasets.push({
+      label:'Gestora',
+      data: COMPETENCIAS.map(c=>compGestora[c] ?? 0),
+      borderColor:'#eb6834', backgroundColor:'rgba(235,104,52,0.12)', pointBackgroundColor:'#eb6834', borderWidth:2
+    });
+  }
+  radarChart = new Chart(ctx, {
+    type:'radar',
+    data:{ labels: COMPETENCIAS.map(c=>COMPETENCIAS_LABEL_CURTO[c]), datasets },
+    options:{
+      scales:{ r:{ min:0, max:3, ticks:{ stepSize:1, backdropColor:'transparent' }, pointLabels:{ font:{size:10} } } },
+      plugins:{ legend:{ display:false } }
+    }
+  });
+
+  document.getElementById('mStatus').value = ma?.status_carreira || '';
+  document.getElementById('mRecomendacao').value = ma?.recomendacao_proximo_cargo || '';
+  document.getElementById('mPontosFortes').value = ma?.pontos_fortes || '';
+  document.getElementById('mPontosDesenvolver').value = ma?.pontos_a_desenvolver || '';
+  document.getElementById('mPlanoAcao').value = ma?.plano_de_acao || '';
+  document.getElementById('saveMsg').style.display='none';
+}
+
+document.getElementById('btnSalvarAnalise').addEventListener('click', async ()=>{
+  const selfAssessmentId = document.getElementById('cycleSelect').value;
+  const sa = activeExec.assessments.find(a=>a.id===selfAssessmentId);
+  if(!sa) return;
+
+  const btn = document.getElementById('btnSalvarAnalise');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  try{
+    let ma = findManagerFor(selfAssessmentId);
+    const payload = {
+      executive_id: activeExec.executive.id,
+      self_assessment_id: selfAssessmentId,
+      ciclo: sa.ciclo,
+      data_avaliacao: new Date().toISOString().slice(0,10),
+      status_carreira: document.getElementById('mStatus').value || null,
+      recomendacao_proximo_cargo: document.getElementById('mRecomendacao').value || null,
+      pontos_fortes: document.getElementById('mPontosFortes').value || null,
+      pontos_a_desenvolver: document.getElementById('mPontosDesenvolver').value || null,
+      plano_de_acao: document.getElementById('mPlanoAcao').value || null,
+      criado_por: currentUser?.id || null
+    };
+
+    let maId;
+    if(ma){
+      maId = ma.id;
+      const { error } = await sb.from('manager_assessments').update(payload).eq('id', maId);
+      if(error) throw error;
+      await sb.from('manager_assessment_competencias').delete().eq('manager_assessment_id', maId);
+      await sb.from('manager_assessment_pontos').delete().eq('manager_assessment_id', maId);
+    } else {
+      const { data, error } = await sb.from('manager_assessments').insert(payload).select('id').single();
+      if(error) throw error;
+      maId = data.id;
+    }
+
+    const compRows = [];
+    document.querySelectorAll('.gestora-comp-select').forEach(sel=>{
+      if(sel.value) compRows.push({ manager_assessment_id: maId, competencia: sel.dataset.comp, nota: Number(sel.value) });
+    });
+    const pontosRows = [];
+    document.querySelectorAll('.gestora-ponto-select').forEach(sel=>{
+      if(sel.value) pontosRows.push({ manager_assessment_id: maId, ponto: sel.dataset.ponto, quadrante: Number(sel.value) });
+    });
+    if(compRows.length) await sb.from('manager_assessment_competencias').insert(compRows);
+    if(pontosRows.length) await sb.from('manager_assessment_pontos').insert(pontosRows);
+
+    await loadTeam();
+    activeExec = teamData.find(t=>t.executive.id===activeExec.executive.id);
+    document.getElementById('teamView').style.display='none';
+    document.getElementById('detailPanel').style.display='block';
+    renderProgressChart();
+    renderCycle(selfAssessmentId);
+    document.getElementById('saveMsg').style.display='block';
+  } catch(err){
+    console.error(err);
+    alert('Não foi possível salvar a análise. ' + (err.message||''));
+  } finally {
+    btn.disabled=false; btn.textContent='Salvar análise da gestora';
+  }
+});
+
+document.getElementById('btnGerarPdf').addEventListener('click', async ()=>{
+  const el = document.getElementById('pdfReport');
+  const canvas = await html2canvas(el, { scale:2, backgroundColor:'#fcfcfb' });
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','mm','a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth - 20;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+  let heightLeft = imgHeight;
+  let position = 10;
+  const imgData = canvas.toDataURL('image/png');
+  pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+  heightLeft -= (pageHeight - 20);
+  while(heightLeft > 0){
+    position = heightLeft - imgHeight + 10;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+    heightLeft -= (pageHeight - 20);
+  }
+  const nome = (activeExec?.executive?.nome || 'evolucao').replace(/\s+/g,'_');
+  pdf.save(`Evolucao_${nome}_${new Date().toISOString().slice(0,10)}.pdf`);
+});
+</script>
+</body>
+</html>
