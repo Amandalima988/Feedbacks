@@ -377,9 +377,8 @@
 
 <script>
 /* ======================================================================
-   const SUPABASE_URL = "sb_publishable_80NRxK9eLvMZ3XA46Wve_A_stG7-XNm
- ";
-const SUPABASE_ANON_KEY = "sb_secret_n6Nr5YTUqR4WEssdNSLvFg_Mdk3ATeQ";
+   EDITE AQUI — cole a URL e a chave (Publishable / anon public) do seu
+   projeto Supabase. Veja em Project Settings → API Keys.
    ====================================================================== */
 const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
 const SUPABASE_ANON_KEY = "SUA-CHAVE-PUBLICA-AQUI";
@@ -633,10 +632,26 @@ document.getElementById('btnLogin').addEventListener('click', async ()=>{
   const senha = document.getElementById('loginSenha').value;
   const errEl = document.getElementById('loginError');
   errEl.style.display='none';
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
-  if(error){ errEl.textContent = 'E-mail ou senha inválidos.'; errEl.style.display='block'; return; }
-  currentUser = data.user;
-  showManagerDashboard();
+
+  if(SUPABASE_URL.includes('SEU-PROJETO') || SUPABASE_ANON_KEY.includes('SUA-CHAVE')){
+    errEl.textContent = 'O painel.html ainda não foi configurado: edite as linhas SUPABASE_URL e SUPABASE_ANON_KEY (procure "EDITE AQUI" no arquivo).';
+    errEl.style.display='block';
+    return;
+  }
+
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
+    if(error){
+      errEl.textContent = 'Erro ao entrar: ' + error.message + (error.status ? ' (código ' + error.status + ')' : '');
+      errEl.style.display='block';
+      return;
+    }
+    currentUser = data.user;
+    showManagerDashboard();
+  } catch(err){
+    errEl.textContent = 'Não foi possível conectar ao Supabase. Confira se SUPABASE_URL e SUPABASE_ANON_KEY no painel.html estão corretos. Detalhe: ' + (err.message || err);
+    errEl.style.display='block';
+  }
 });
 document.getElementById('btnLogout').addEventListener('click', async ()=>{
   await sb.auth.signOut();
