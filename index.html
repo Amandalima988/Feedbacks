@@ -3,29 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Feedbacks do Time — Autoanálise e Progressão de Carreira</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>Atualização de Carreira · Feedback do Time</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --paper:#FAF7F1; --card:#FFFFFF; --ink:#20302B; --ink-soft:#5B6B64;
-  --pine:#24413B; --pine-dark:#182D28; --line:#E4DCC9;
-  --sage:#6E9A80; --sage-bg:#EDF3EC;
-  --amber:#C98A3A; --amber-bg:#FBF1E1;
-  --slate:#4F708A; --slate-bg:#EBF1F5;
-  --lilac:#6F5E8C; --lilac-bg:#EFEAF4;
-  --rose:#A24E68; --rose-bg:#F6E8ED;
-  --teal:#2E8B84; --teal-bg:#E4F2F0;
+  --paper:#EEF3F7; --card:#FFFFFF; --ink:#12232F; --ink-soft:#5B7285; --ink-faint:#8CA0AF;
+  --pine:#0A2A43; --pine-dark:#123A5C; --pine-3:#1B4E76; --line:#DEE6EC;
+  --sage:#2C9A66; --sage-bg:#E3F5EC;
+  --amber:#B9791A; --amber-bg:#FBF1DE;
+  --slate:#1C7EBE; --slate-bg:#E4F1FA;
+  --lilac:#7C4FCB; --lilac-bg:#F1EAFB;
+  --rose:#C0492E; --rose-bg:#FBE9E5;
+  --teal:#0E7C86; --teal-bg:#E1F2F1;
   --clay:#9C6B3F; --clay-bg:#F3E9DD;
-  --danger:#B5573F;
+  --danger:#C0492E;
+  --radius:16px;
+  --shadow-xs:0 1px 2px rgba(10,42,67,.05);
+  --shadow-sm:0 4px 14px -6px rgba(10,42,67,.14);
+  --shadow-md:0 14px 34px -14px rgba(10,42,67,.28);
+  --shadow-lg:0 24px 60px -20px rgba(10,42,67,.34);
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{ background:var(--paper); color:var(--ink); font-family:'Inter',system-ui,sans-serif; font-size:14.5px; line-height:1.5; -webkit-font-smoothing:antialiased; }
-h1,h2,h3,.display{ font-family:'Fraunces',serif; }
-.mono{ font-family:'IBM Plex Mono',monospace; letter-spacing:.02em; }
+h1,h2,h3,.display{ font-family:'Manrope',sans-serif; font-weight:800; letter-spacing:-.01em; }
+.mono{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:600; letter-spacing:.01em; }
 a{ color:inherit; }
 
 select, input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], textarea{
@@ -37,31 +42,67 @@ select{ width:auto; }
 input:focus, textarea:focus, select:focus{ outline:2px solid var(--slate); outline-offset:1px; }
 label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); display:block; margin-bottom:5px; }
 
-.btn{ font-family:'Inter',sans-serif; font-weight:600; font-size:13px; border-radius:8px; padding:9px 14px; border:1px solid transparent; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+.btn{ font-family:'Inter',sans-serif; font-weight:700; font-size:13px; border-radius:10px; padding:9px 16px; border:1px solid transparent; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:.15s; }
 .btn-primary{ background:var(--pine); color:#fff; }
 .btn-primary:hover{ background:var(--pine-dark); }
 .btn-primary:disabled{ opacity:.6; cursor:default; }
 .btn-ghost{ background:transparent; color:var(--pine); border-color:var(--line); }
-.btn-ghost:hover{ background:#fff; }
+.btn-ghost:hover{ background:var(--slate-bg); border-color:var(--slate); color:var(--slate); }
 .btn-add{ background:transparent; color:inherit; border:1px dashed currentColor; font-weight:600; padding:8px 12px; }
 .btn-remove{ background:transparent; border:none; color:var(--danger); cursor:pointer; font-size:18px; line-height:1; padding:2px 6px; }
 .btn-remove:hover{ opacity:.7; }
+.btn-sm{ padding:6px 12px; font-size:12px; }
 .error-msg{ color:var(--danger); font-size:12.5px; margin-top:10px; display:none; }
 .ok-msg{ color:var(--sage); font-weight:600; font-size:13px; margin-top:10px; display:none; }
 
+/* ---------- KPI / CARD / BADGE / TOOLBAR (padrão Atualização Cadastral) ---------- */
+.kpi-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; }
+.kpi{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px 12px; position:relative; overflow:hidden; }
+.kpi::before{ content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--slate); }
+.kpi.leaf::before{ background:var(--sage); } .kpi.amber::before{ background:var(--amber); } .kpi.rose::before{ background:var(--rose); }
+.kpi .kpi-label{ font-size:11px; color:var(--ink-soft); font-weight:700; margin-bottom:6px; }
+.kpi .kpi-value{ font-family:'Manrope',sans-serif; font-size:22px; font-weight:800; color:var(--pine); }
+.kpi .kpi-value.leaf{ color:var(--sage); } .kpi .kpi-value.amber{ color:var(--amber); } .kpi .kpi-value.rose{ color:var(--rose); }
+.gcard{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px 20px 22px; box-shadow:var(--shadow-xs); margin-top:16px; }
+.gcard h2{ font-size:15px; font-weight:800; color:var(--pine); margin:0 0 4px; }
+.gcard .sub{ font-size:12.5px; color:var(--ink-soft); margin:0 0 14px; line-height:1.55; }
+.badge{ display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:100px; font-size:10.5px; font-weight:700; white-space:nowrap; }
+.badge-pendente{ background:var(--amber-bg); color:var(--amber); }
+.badge-novo{ background:var(--rose-bg); color:var(--rose); }
+.badge-ok{ background:var(--sage-bg); color:var(--sage); }
+.badge-info{ background:var(--slate-bg); color:var(--slate); }
+.toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:14px 0; }
+.toolbar select, .toolbar input{ font-size:13px; padding:9px 12px; }
+.search-box{ position:relative; flex:1; min-width:200px; }
+.search-box input{ padding-left:32px; }
+.search-box .sbicon{ position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--ink-faint); }
+
 /* ---------- HOME ---------- */
-#screenHome{ display:flex; align-items:center; justify-content:center; min-height:100vh; }
-#screenHome .box{ max-width:460px; padding:20px; text-align:center; }
-#screenHome h1{ font-size:27px; margin-bottom:8px; }
-#screenHome p{ color:var(--ink-soft); font-size:14px; margin-bottom:28px; }
+#screenHome{
+  display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px;
+  background:
+    radial-gradient(1100px 420px at 12% -20%, rgba(255,255,255,.08), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(28,126,190,.35), transparent 55%),
+    linear-gradient(160deg, var(--pine) 0%, var(--pine-dark) 55%, var(--pine-3) 100%);
+}
+#screenHome .box{ max-width:460px; width:100%; padding:32px 30px; text-align:center; background:var(--card); border-radius:18px; box-shadow:var(--shadow-lg); }
+#screenHome .eyebrow{ display:inline-flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--slate); font-weight:700; margin-bottom:12px; }
+#screenHome h1{ font-size:24px; margin-bottom:8px; color:var(--pine); }
+#screenHome p{ color:var(--ink-soft); font-size:14px; margin-bottom:26px; }
 #screenHome .links{ display:flex; flex-direction:column; gap:12px; }
-#screenHome a{ display:block; padding:17px; border-radius:12px; text-decoration:none; font-weight:600; border:1px solid var(--line); background:var(--card); color:var(--ink); transition:box-shadow .15s; cursor:pointer; }
-#screenHome a:hover{ box-shadow:0 8px 22px rgba(24,45,40,.08); }
+#screenHome a{ display:block; padding:17px; border-radius:12px; text-decoration:none; font-weight:700; border:1px solid var(--line); background:#FBFDFE; color:var(--ink); transition:.15s; cursor:pointer; }
+#screenHome a:hover{ border-color:var(--slate); background:var(--slate-bg); box-shadow:var(--shadow-sm); }
 #screenHome a small{ display:block; font-weight:400; color:var(--ink-soft); margin-top:3px; }
 
 /* ---------- LOGIN GATE (gestora) ---------- */
-.login-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
-.login-card{ width:100%; max-width:360px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:30px 26px; box-shadow:0 12px 32px rgba(24,45,40,.10); }
+.login-screen{
+  min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  background:
+    radial-gradient(1100px 420px at 12% -20%, rgba(255,255,255,.08), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(28,126,190,.35), transparent 55%),
+    linear-gradient(160deg, var(--pine) 0%, var(--pine-dark) 55%, var(--pine-3) 100%);
+}
+.login-card{ width:100%; max-width:380px; background:var(--card); border-radius:18px; padding:32px 28px; box-shadow:var(--shadow-lg); }
 .login-eyebrow{ font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-soft); }
 .login-card h1{ font-size:22px; margin:6px 0 4px; }
 .login-sub{ color:var(--ink-soft); font-size:13px; margin:0 0 20px; }
@@ -70,34 +111,34 @@ label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:v
 /* ---------- SIDEBAR (gestora) ---------- */
 .app-shell{ display:none; min-height:100vh; }
 .app-shell.unlocked{ display:flex; }
-.sidebar{ width:290px; min-width:290px; background:var(--pine); color:#EFEBDD; display:flex; flex-direction:column; max-height:100vh; position:sticky; top:0; }
+.sidebar{ width:290px; min-width:290px; background:linear-gradient(180deg, var(--pine) 0%, var(--pine-dark) 100%); color:#DCEAF4; display:flex; flex-direction:column; max-height:100vh; position:sticky; top:0; }
 .sidebar-head{ padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,.12); }
-.sidebar-head .eyebrow{ font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:#B9CFC3; }
+.sidebar-head .eyebrow{ font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:#BFE0F5; }
 .sidebar-head h1{ font-size:20px; font-weight:600; margin:6px 0 12px; color:#fff; }
 .progress-track{ height:6px; border-radius:4px; background:rgba(255,255,255,.15); overflow:hidden; }
-.progress-fill{ height:100%; background:linear-gradient(90deg,#8FBBA0,#EFEBDD); width:0%; transition:width .4s ease; }
-.progress-label{ font-size:11.5px; color:#C7D9CE; margin-top:6px; display:flex; justify-content:space-between; }
+.progress-fill{ height:100%; background:linear-gradient(90deg,#5FC1F0,#FFFFFF); width:0%; transition:width .4s ease; }
+.progress-label{ font-size:11.5px; color:#CBDCE9; margin-top:6px; display:flex; justify-content:space-between; }
 .nav-tabs{ display:flex; flex-wrap:wrap; gap:6px; margin-top:16px; }
-.nav-tab{ flex:1 1 auto; min-width:84px; font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:7px 6px; border-radius:7px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#C7D9CE; cursor:pointer; }
-.nav-tab.active{ background:#EFEBDD; color:var(--pine-dark); border-color:#EFEBDD; }
+.nav-tab{ flex:1 1 auto; min-width:84px; font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:7px 6px; border-radius:7px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#CBDCE9; cursor:pointer; }
+.nav-tab.active{ background:#FFFFFF; color:var(--pine-dark); border-color:#FFFFFF; }
 .nav-tab:hover:not(.active){ background:rgba(255,255,255,.08); }
 .sidebar-search{ padding:10px 14px 0; }
 .sidebar-search input{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#fff; }
-.sidebar-search input::placeholder{ color:#9DB8AC; }
+.sidebar-search input::placeholder{ color:#8CA6B8; }
 .timeline{ flex:1; overflow-y:auto; padding:8px 10px 24px; }
-.week-label{ font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:#9DB8AC; padding:10px 10px 6px; }
+.week-label{ font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:#8CA6B8; padding:10px 10px 6px; }
 .item{ display:flex; align-items:flex-start; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; border:1px solid transparent; }
 .item:hover{ background:rgba(255,255,255,.07); }
-.item.active{ background:#EFEBDD; color:var(--pine-dark); }
-.dot{ width:10px; height:10px; border-radius:50%; margin-top:5px; flex:none; border:2px solid #9DB8AC; background:transparent; }
-.dot.done{ background:#8FBBA0; border-color:#8FBBA0; }
+.item.active{ background:#FFFFFF; color:var(--pine-dark); }
+.dot{ width:10px; height:10px; border-radius:50%; margin-top:5px; flex:none; border:2px solid #8CA6B8; background:transparent; }
+.dot.done{ background:#5FC1F0; border-color:#5FC1F0; }
 .item.active .dot{ border-color:var(--pine); }
 .item.active .dot.done{ background:var(--sage); border-color:var(--sage); }
 .item-name{ font-size:13.5px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.item-sub{ font-size:11px; color:#B9CFC3; }
+.item-sub{ font-size:11px; color:#BFE0F5; }
 .item.active .item-sub{ color:var(--pine-dark); opacity:.65; }
 .sidebar-foot{ padding:10px 14px 16px; border-top:1px solid rgba(255,255,255,.12); }
-.sidebar-foot .link-btn{ color:#EFEBDD; border-color:rgba(255,255,255,.25); background:transparent; }
+.sidebar-foot .link-btn{ color:#FFFFFF; border-color:rgba(255,255,255,.25); background:transparent; }
 
 /* ---------- MAIN ---------- */
 .main{ flex:1; min-width:0; padding:34px 42px 80px; max-width:960px; }
@@ -133,20 +174,20 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .self-crit-name{ font-weight:600; font-size:13.5px; margin-bottom:10px; display:block; }
 .pick-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
 .pick-card{ border:1.5px solid var(--line); border-radius:10px; padding:10px 11px; cursor:pointer; background:#fff; transition:border-color .15s, background .15s; }
-.pick-card:hover{ border-color:#B9B2A0; }
+.pick-card:hover{ border-color:#C9D6DF; }
 .pick-card .pick-level{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; margin-bottom:5px; display:block; }
 .pick-card .pick-desc{ font-size:12.5px; color:var(--ink-soft); line-height:1.45; }
-.pick-card[data-level="1"] .pick-level{ color:#4C7A5F; }
-.pick-card[data-level="2"] .pick-level{ color:#A66C1F; }
-.pick-card[data-level="3"] .pick-level{ color:#3A5A73; }
+.pick-card[data-level="1"] .pick-level{ color:#1F7A50; }
+.pick-card[data-level="2"] .pick-level{ color:#96600F; }
+.pick-card[data-level="3"] .pick-level{ color:#145A87; }
 .pick-card[data-level="1"].active{ background:var(--sage-bg); border-color:var(--sage); }
 .pick-card[data-level="2"].active{ background:var(--amber-bg); border-color:var(--amber); }
 .pick-card[data-level="3"].active{ background:var(--slate-bg); border-color:var(--slate); }
 .pick-card.active .pick-desc{ color:var(--ink); }
 .pick-card.readonly{ cursor:default; }
-.result-panel{ padding:14px 16px; border-radius:10px; background:#F6F3EC; border:1px solid var(--line); }
-.result-title{ font-family:'Fraunces',serif; font-size:15px; font-weight:600; margin-bottom:8px; }
-.result-bar-track{ display:flex; height:12px; border-radius:999px; overflow:hidden; background:#E9E3D2; margin-bottom:8px; }
+.result-panel{ padding:14px 16px; border-radius:10px; background:#F0F5F9; border:1px solid var(--line); }
+.result-title{ font-family:'Manrope',sans-serif; font-size:15px; font-weight:600; margin-bottom:8px; }
+.result-bar-track{ display:flex; height:12px; border-radius:999px; overflow:hidden; background:#DCE7EF; margin-bottom:8px; }
 .result-bar-seg.l1{ background:var(--sage); } .result-bar-seg.l2{ background:var(--amber); } .result-bar-seg.l3{ background:var(--slate); }
 .result-legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-soft); }
 .result-legend span{ display:inline-flex; align-items:center; gap:6px; }
@@ -162,7 +203,7 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .comp-desc{ font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
 .score-buttons{ display:flex; gap:6px; flex:none; }
 .score-btn{ width:74px; padding:7px 4px 6px; border-radius:8px; border:1.5px solid var(--line); background:#fff; cursor:pointer; text-align:center; color:var(--ink-soft); }
-.score-btn .num{ font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:15px; display:block; }
+.score-btn .num{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:700; font-size:15px; display:block; }
 .score-btn .cap{ display:block; font-size:8.3px; font-weight:500; margin-top:2px; line-height:1.15; }
 .score-btn[data-score="1"].active{ background:var(--amber-bg); border-color:var(--amber); color:#5C3E13; }
 .score-btn[data-score="2"].active{ background:var(--slate-bg); border-color:var(--slate); color:#2C4256; }
@@ -170,7 +211,7 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .score-btn.readonly{ cursor:default; }
 
 /* mandala radar */
-.mandala-sub-title{ font-family:'Fraunces',serif; font-size:15px; font-weight:600; margin:2px 0 10px; color:var(--pine-dark); }
+.mandala-sub-title{ font-family:'Manrope',sans-serif; font-size:15px; font-weight:600; margin:2px 0 10px; color:var(--pine-dark); }
 .radar-wrap{ display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
 .radar-legend{ display:flex; gap:16px; font-size:11.5px; color:var(--ink-soft); margin-top:6px; justify-content:center; }
 .radar-legend span{ display:inline-flex; align-items:center; gap:6px; }
@@ -178,8 +219,8 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .stats-col{ flex:1; min-width:260px; }
 .stat-line{ display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0; border-bottom:1px dashed var(--line); }
 .stat-line:last-child{ border-bottom:none; }
-.stat-badge{ font-family:'IBM Plex Mono',monospace; font-weight:700; padding:2px 10px; border-radius:999px; color:#fff; font-size:10.5px; white-space:nowrap; }
-.stat-badge.s1{ background:var(--amber); } .stat-badge.s2{ background:var(--slate); } .stat-badge.s3{ background:var(--sage); } .stat-badge.na{ background:#B9B2A0; }
+.stat-badge{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:700; padding:2px 10px; border-radius:999px; color:#fff; font-size:10.5px; white-space:nowrap; }
+.stat-badge.s1{ background:var(--amber); } .stat-badge.s2{ background:var(--slate); } .stat-badge.s3{ background:var(--sage); } .stat-badge.na{ background:#C9D6DF; }
 .insight-cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
 .insight-box{ border:1px solid var(--line); border-radius:10px; padding:11px 13px; background:#FEFDFB; }
 .insight-box h4{ margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
@@ -197,14 +238,14 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .bar-chart{ display:flex; align-items:flex-end; gap:14px; height:90px; margin-top:6px; padding:0 6px; }
 .bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
 .bar-col .bar{ width:100%; max-width:46px; background:var(--clay); border-radius:4px 4px 0 0; }
-.bar-col .bar-val{ font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); margin-bottom:4px; }
+.bar-col .bar-val{ font-size:11px; font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; color:var(--ink-soft); margin-bottom:4px; }
 .bar-col .bar-label{ font-size:10.5px; color:var(--ink-soft); margin-top:6px; text-align:center; }
 
 .entry{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:#FEFDFB; }
 .entry-row{ display:flex; gap:10px; align-items:flex-start; }
 .entry-row > textarea{ flex:1; }
 .entry-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
-.entry-index{ font-size:11px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; }
+.entry-index{ font-size:11px; color:var(--ink-soft); font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; }
 .next-fields{ display:grid; grid-template-columns:2fr 1fr 1.4fr; gap:10px; }
 .empty-block-msg{ font-size:13px; color:var(--ink-soft); font-style:italic; }
 .aspiration-grid{ display:grid; grid-template-columns:1fr; gap:14px; }
@@ -218,8 +259,8 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 @media (max-width: 860px){ .quadrant-grid{ grid-template-columns:1fr; } }
 .qcol{ border-radius:14px; border:1px solid var(--line); background:var(--card); overflow:hidden; display:flex; flex-direction:column; }
 .qcol-head{ padding:16px 16px 14px; }
-.qcol-head .qname{ font-family:'Fraunces',serif; font-size:17px; font-weight:600; margin:0 0 6px; }
-.qcol-head .qcount{ font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
+.qcol-head .qname{ font-family:'Manrope',sans-serif; font-size:17px; font-weight:600; margin:0 0 6px; }
+.qcol-head .qcount{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
 .qcol-body{ padding:12px; display:flex; flex-direction:column; gap:10px; flex:1; }
 .qcard{ border:1px solid var(--line); border-radius:10px; padding:11px 12px; cursor:pointer; background:#FEFDFB; }
 .qcard:hover{ border-color:var(--pine); }
@@ -228,11 +269,11 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .qcard-empty-msg{ font-size:12px; color:var(--ink-soft); font-style:italic; padding:6px 2px; }
 .heatmap-table{ font-size:11px; }
 .heatmap-table th, .heatmap-table td{ padding:6px 8px; white-space:nowrap; }
-.heatmap-table th.heatmap-sticky, .heatmap-table td.heatmap-sticky{ position:sticky; left:0; background:#F6F3EC; white-space:normal; min-width:150px; }
+.heatmap-table th.heatmap-sticky, .heatmap-table td.heatmap-sticky{ position:sticky; left:0; background:#F0F5F9; white-space:normal; min-width:150px; }
 .heatmap-table td.heatmap-sticky{ background:#fff; }
 table.rp-compare-table{ width:100%; border-collapse:collapse; margin-bottom:6px; }
 table.rp-compare-table th, table.rp-compare-table td{ border:1px solid #ddd; padding:7px 9px; text-align:left; font-size:11.5px; vertical-align:top; }
-table.rp-compare-table th{ background:#F6F3EC; font-weight:600; }
+table.rp-compare-table th{ background:#F0F5F9; font-weight:600; }
 
 @media (max-width: 900px){
   .sidebar{ width:100%; min-width:0; position:relative; max-height:none; }
@@ -254,11 +295,11 @@ table.rp-compare-table th{ background:#F6F3EC; font-weight:600; }
 }
 .rp-page{ font-family:'Inter',sans-serif; color:#1a1a1a; font-size:12.5px; line-height:1.5; }
 .rp-header{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--pine); padding-bottom:12px; margin-bottom:18px; }
-.rp-header h1{ font-family:'Fraunces',serif; font-size:22px; margin:0; color:var(--pine-dark); }
+.rp-header h1{ font-family:'Manrope',sans-serif; font-size:22px; margin:0; color:var(--pine-dark); }
 .rp-meta{ font-size:11.5px; color:#555; }
 .rp-official-box{ background:var(--amber-bg); border-radius:10px; padding:14px 18px; margin-bottom:20px; }
-.rp-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:#4A5A50; }
-.rp-section-title{ font-family:'Fraunces',serif; font-size:14.5px; font-weight:600; margin:20px 0 8px; border-bottom:1px solid #ddd; padding-bottom:4px; color:var(--pine-dark); }
+.rp-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:#5B7285; }
+.rp-section-title{ font-family:'Manrope',sans-serif; font-size:14.5px; font-weight:600; margin:20px 0 8px; border-bottom:1px solid #ddd; padding-bottom:4px; color:var(--pine-dark); }
 .rp-pill{ display:inline-block; padding:2px 9px; border-radius:999px; color:#fff; font-size:10.5px; font-weight:600; }
 .rp-pill.s1, .rp-pill.l1{ background:var(--amber); } .rp-pill.s2, .rp-pill.l2{ background:var(--slate); } .rp-pill.s3, .rp-pill.l3{ background:var(--sage); } .rp-pill.empty{ background:#D9D3C4; color:#6b6b6b; }
 .rp-list{ margin:0 0 4px; padding-left:18px; }
@@ -269,7 +310,7 @@ table.rp-compare-table th{ background:#F6F3EC; font-weight:600; }
 .rp-mandala-stats{ flex:1; min-width:220px; }
 .rp-stat-line{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:11.5px; padding:4.5px 0; border-bottom:1px dashed #ddd; }
 .rp-insight-cols{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:4px; }
-.rp-insight-cols h4{ font-family:'Fraunces',serif; font-size:12.5px; font-weight:600; margin:0 0 6px; color:var(--pine-dark); }
+.rp-insight-cols h4{ font-family:'Manrope',sans-serif; font-size:12.5px; font-weight:600; margin:0 0 6px; color:var(--pine-dark); }
 </style>
 </head>
 <body>
@@ -383,11 +424,13 @@ table.rp-compare-table th{ background:#F6F3EC; font-weight:600; }
         <div class="nav-tabs">
           <button class="nav-tab active" id="navEquipe" type="button">Equipe</button>
           <button class="nav-tab" id="navQuadro" type="button">Quadro Gerencial</button>
+          <button class="nav-tab" id="navImportar" type="button">Importar dados</button>
         </div>
       </div>
       <div class="sidebar-search"><input type="text" id="sidebarSearch" placeholder="Buscar por nome..."></div>
       <div class="timeline" id="timeline"></div>
       <div class="sidebar-foot" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn link-btn" id="btnRefresh" type="button" title="Buscar autoanálises novas enviadas pelo time">↻ Atualizar dados</button>
         <button class="btn link-btn" id="btnLogout">Sair</button>
       </div>
     </aside>
@@ -412,8 +455,114 @@ const SUPABASE_URL = "https://fxcqzlafrapbzlsoisbg.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_80NRxK9eLvMZ3XA46Wve_A_stG7-XNm";
 /* ====================================================================== */
 
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ----------------------------------------------------------------------
+   Cliente Supabase "caseiro" — fala direto com a API REST/Auth do
+   Supabase via fetch(), sem depender de nenhum script externo (mesmo
+   padrão usado no painel de Atualização Cadastral). Isso evita telas de
+   login travadas por causa de CDN bloqueado/lento.
+   ---------------------------------------------------------------------- */
+const REST_URL = SUPABASE_URL.replace(/\/$/, '') + '/rest/v1';
+const AUTH_URL = SUPABASE_URL.replace(/\/$/, '') + '/auth/v1';
+const SESSION_KEY = 'painel_gestora_sessao_v2';
+let authToken = null;
+
+function loadSavedSession(){
+  try{ const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function saveSession(s){ try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }catch(e){} }
+function clearSavedSession(){ try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
+function authHeaders(){
+  return { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + (authToken || SUPABASE_ANON_KEY), 'Content-Type': 'application/json' };
+}
+
+let refreshInFlight = null;
+async function tryRefreshToken(){
+  const saved = loadSavedSession();
+  if(!saved || !saved.refresh_token) return false;
+  if(refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async ()=>{
+    try{
+      const res = await fetch(AUTH_URL + '/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: saved.refresh_token })
+      });
+      const data = await res.json().catch(()=> ({}));
+      if(!res.ok || !data.access_token) return false;
+      authToken = data.access_token;
+      saveSession(data);
+      return true;
+    }catch(e){ return false; }
+    finally{ refreshInFlight = null; }
+  })();
+  return refreshInFlight;
+}
+
+class RestQuery{
+  constructor(table){ this.table = table; this.qs = []; this.method = 'GET'; this.body = null; this.extraHeaders = {}; this._single = false; this._maybeSingle = false; }
+  select(cols){ this.qs.push('select=' + encodeURIComponent(cols || '*')); return this; }
+  order(col, opts){ this.qs.push('order=' + encodeURIComponent(col + '.' + ((opts && opts.ascending === false) ? 'desc' : 'asc'))); return this; }
+  eq(col, val){ this.qs.push(encodeURIComponent(col) + '=eq.' + encodeURIComponent(val)); return this; }
+  ilike(col, val){ this.qs.push(encodeURIComponent(col) + '=ilike.' + encodeURIComponent(val)); return this; }
+  insert(rows){ this.method = 'POST'; this.body = rows; this.extraHeaders['Prefer'] = 'return=representation'; return this; }
+  update(obj){ this.method = 'PATCH'; this.body = obj; this.extraHeaders['Prefer'] = 'return=representation'; return this; }
+  delete(){ this.method = 'DELETE'; this.extraHeaders['Prefer'] = 'return=minimal'; return this; }
+  single(){ this._single = true; return this; }
+  maybeSingle(){ this._maybeSingle = true; return this; }
+  async _exec(retried){
+    const url = REST_URL + '/' + this.table + (this.qs.length ? '?' + this.qs.join('&') : '');
+    const opts = { method: this.method, headers: Object.assign({}, authHeaders(), this.extraHeaders) };
+    if(this.body !== null && this.method !== 'GET' && this.method !== 'DELETE') opts.body = JSON.stringify(this.body);
+    try{
+      const res = await fetch(url, opts);
+      if(res.status === 401 && !retried && await tryRefreshToken()){
+        return this._exec(true); // sessão expirou no meio do uso: renova o token e tenta de novo, uma vez
+      }
+      const text = await res.text().catch(()=> '');
+      if(!res.ok){
+        let msg = 'Erro ' + res.status;
+        try{ const j = text ? JSON.parse(text) : null; if(j && (j.message || j.msg)) msg = j.message || j.msg; }catch(e){}
+        return { data: null, error: { message: msg, status: res.status } };
+      }
+      let data = text ? JSON.parse(text) : null;
+      if((this._single || this._maybeSingle) && Array.isArray(data)) data = data.length ? data[0] : null;
+      return { data, error: null };
+    }catch(err){
+      return { data: null, error: { message: (err && err.message) || 'Falha de conexão com o Supabase.' } };
+    }
+  }
+  then(resolve, reject){ return this._exec().then(resolve, reject); }
+}
+
+const sb = {
+  from(table){ return new RestQuery(table); },
+  auth: {
+    async signInWithPassword({ email, password }){
+      try{
+        const res = await fetch(AUTH_URL + '/token?grant_type=password', {
+          method: 'POST',
+          headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json().catch(()=> ({}));
+        if(!res.ok || !data.access_token){
+          return { data: null, error: { message: data.error_description || data.msg || 'E-mail ou senha inválidos.', status: res.status } };
+        }
+        authToken = data.access_token;
+        saveSession(data);
+        return { data: { user: data.user, session: data }, error: null };
+      }catch(err){
+        return { data: null, error: { message: (err && err.message) || 'Não foi possível conectar ao Supabase.' } };
+      }
+    },
+    async getSession(){
+      const saved = loadSavedSession();
+      if(saved && saved.access_token){ authToken = saved.access_token; return { data: { session: saved } }; }
+      return { data: { session: null } };
+    },
+    async signOut(){ clearSavedSession(); authToken = null; return { error: null }; }
+  }
+};
 
 // ---- 12 pontos comportamentais (nome exato = como é salvo no banco) ----
 const CRITERIA = [
@@ -532,24 +681,24 @@ function buildRadarSVG(mainScores, refScores){
       const r = (level/3)*maxR;
       return `${cx+r*Math.cos(angle)},${cy+r*Math.sin(angle)}`;
     });
-    grid += `<polygon points="${pts.join(' ')}" fill="none" stroke="#E4DCC9" stroke-width="1"/>`;
+    grid += `<polygon points="${pts.join(' ')}" fill="none" stroke="#DEE6EC" stroke-width="1"/>`;
   });
   let axes = '';
   COMPETENCIAS.forEach((c,i)=>{
     const angle = start + i*angleStep;
     const x2 = cx + maxR*Math.cos(angle), y2 = cy + maxR*Math.sin(angle);
-    axes += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#E4DCC9" stroke-width="1"/>`;
+    axes += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#DEE6EC" stroke-width="1"/>`;
     const lx = cx + (maxR+14)*Math.cos(angle), ly = cy + (maxR+14)*Math.sin(angle);
     let anchor = 'middle';
     if(Math.cos(angle) > 0.25) anchor='start'; else if(Math.cos(angle) < -0.25) anchor='end';
-    axes += `<text x="${lx}" y="${ly}" font-size="9" font-family="Inter, sans-serif" fill="#5B6B64" text-anchor="${anchor}" dominant-baseline="middle">${c[2]}</text>`;
+    axes += `<text x="${lx}" y="${ly}" font-size="9" font-family="Inter, sans-serif" fill="#5B7285" text-anchor="${anchor}" dominant-baseline="middle">${c[2]}</text>`;
   });
   function polyFor(scores, color, opacity, dashed){
     const pts = COMPETENCIAS.map((c,i)=>ptAt(scores[c[0]], i).join(',')).join(' ');
     return `<polygon points="${pts}" fill="${color}" fill-opacity="${opacity}" stroke="${color}" stroke-width="2" ${dashed?'stroke-dasharray="4,3"':''}/>`;
   }
-  const mainPoly = polyFor(mainScores, '#A24E68', 0.22, false);
-  const refPoly = refScores ? polyFor(refScores, '#24413B', 0.06, true) : '';
+  const mainPoly = polyFor(mainScores, '#C0492E', 0.22, false);
+  const refPoly = refScores ? polyFor(refScores, '#0A2A43', 0.06, true) : '';
   return `<svg viewBox="0 0 ${size+140} ${size}" width="100%" style="max-width:440px; display:block; margin:0 auto;">${grid}${axes}${refPoly}${mainPoly}</svg>`;
 }
 
@@ -763,6 +912,7 @@ function showManagerApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appShell').classList.add('unlocked');
   loadTeam();
+  startAutoRefresh();
 }
 document.getElementById('btnLogin').addEventListener('click', async ()=>{
   const email = document.getElementById('loginEmail').value.trim();
@@ -783,18 +933,45 @@ document.getElementById('btnLogin').addEventListener('click', async ()=>{
     errEl.style.display='block';
   }
 });
-document.getElementById('btnLogout').addEventListener('click', async ()=>{ await sb.auth.signOut(); showManagerLogin(); });
+document.getElementById('btnLogout').addEventListener('click', async ()=>{ await sb.auth.signOut(); stopAutoRefresh(); showManagerLogin(); });
 
-document.getElementById('navEquipe').addEventListener('click', ()=>{ currentView='equipe'; setActiveTab(); renderSidebarAndMain(); });
+document.getElementById('navEquipe').addEventListener('click', ()=>{ currentView='equipe'; activeExec=null; setActiveTab(); renderSidebarAndMain(); });
 document.getElementById('navQuadro').addEventListener('click', ()=>{ currentView='quadro'; setActiveTab(); renderQuadroGerencial(); });
+document.getElementById('navImportar').addEventListener('click', ()=>{ currentView='importar'; setActiveTab(); renderImportador(); });
 function setActiveTab(){
   document.getElementById('navEquipe').classList.toggle('active', currentView==='equipe');
   document.getElementById('navQuadro').classList.toggle('active', currentView==='quadro');
+  document.getElementById('navImportar').classList.toggle('active', currentView==='importar');
 }
 document.getElementById('sidebarSearch').addEventListener('input', ()=>renderTimeline());
 
-async function loadTeam(){
-  const { data: execs } = await sb.from('executives').select('*').order('nome');
+// ---- atualização de dados: manual + automática (para refletir autoanálises novas) ----
+let autoRefreshTimer = null;
+let lastKnownSelfCount = null;
+function startAutoRefresh(){
+  stopAutoRefresh();
+  autoRefreshTimer = setInterval(()=>{ loadTeam(true); }, 90000); // a cada 90s
+}
+function stopAutoRefresh(){ if(autoRefreshTimer){ clearInterval(autoRefreshTimer); autoRefreshTimer=null; } }
+document.getElementById('btnRefresh').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnRefresh');
+  btn.disabled = true; btn.textContent = 'Atualizando...';
+  await loadTeam(true);
+  btn.disabled = false; btn.textContent = '↻ Atualizar dados';
+});
+
+async function loadTeam(silent){
+  const execsRes = await sb.from('executives').select('*').order('nome');
+  if(execsRes.error && (execsRes.error.status === 401 || execsRes.error.status === 403)){
+    stopAutoRefresh();
+    clearSavedSession();
+    showManagerLogin();
+    const errEl = document.getElementById('loginError');
+    errEl.textContent = 'Sua sessão expirou. Entre novamente.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const execs = execsRes.data;
   const { data: assessments } = await sb.from('self_assessments')
     .select('*, self_assessment_pontos(*), self_assessment_competencias(*)')
     .order('data_preenchimento', { ascending:true });
@@ -808,8 +985,36 @@ async function loadTeam(){
     managerAssessments: (managerAssessments||[]).filter(m=>m.executive_id===ex.id)
   }));
 
+  const totalSelf = (assessments||[]).length;
+  if(lastKnownSelfCount !== null && totalSelf > lastKnownSelfCount && silent){
+    showToast((totalSelf - lastKnownSelfCount) + ' nova(s) autoanálise(s) recebida(s).');
+  }
+  lastKnownSelfCount = totalSelf;
+
   updateProgress();
-  renderSidebarAndMain();
+  // se já havia alguém selecionado, mantém a seleção e re-renderiza com os dados atualizados
+  if(activeExec){
+    const stillThere = teamData.find(t=>t.executive.id===activeExec.executive.id);
+    if(stillThere){ selectCollaborator(stillThere.executive.id); }
+    else { activeExec = null; }
+  }
+  if(currentView==='quadro') renderQuadroGerencial();
+  else if(currentView==='importar'){ /* mantém a tela de importação como está */ }
+  else renderSidebarAndMain();
+}
+
+function showToast(msg){
+  let el = document.getElementById('toastMsg');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'toastMsg';
+    el.style.cssText = 'position:fixed; bottom:20px; right:20px; background:var(--pine); color:#fff; padding:12px 18px; border-radius:10px; font-size:13px; font-weight:600; box-shadow:var(--shadow-md); z-index:9999; max-width:320px;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(()=>{ el.style.display='none'; }, 6000);
 }
 
 function latestSelf(t){ return t.assessments.length ? t.assessments[t.assessments.length-1] : null; }
@@ -825,16 +1030,59 @@ function updateProgress(){
   document.getElementById('progressPct').textContent = pct+'%';
 }
 
+function hasUnreviewedSelf(t){
+  const last = latestSelf(t);
+  if(!last) return false;
+  return !managerForSelf(t, last.id);
+}
+
 function renderSidebarAndMain(){
   renderTimeline();
   if(!activeExec){
-    document.getElementById('main').innerHTML = `
-      <div class="empty-state">
-        <div class="mono" style="color:var(--ink-soft); text-transform:uppercase; letter-spacing:.12em; font-size:11px;">Selecione um(a) colaborador(a)</div>
-        <h2>Roteiro de feedback</h2>
-        <p>Escolha alguém na lista ao lado para ver a autoanálise, preencher a Análise da Gestão, o Feedback Geral com a Mandala de Competências, acionamentos, consumo estratégico e os demais pontos do ciclo.</p>
-      </div>`;
+    document.getElementById('main').innerHTML = renderOverviewDashboard();
+    const jump = document.getElementById('btnJumpImportar');
+    if(jump) jump.addEventListener('click', ()=>{ currentView='importar'; setActiveTab(); renderImportador(); });
+    document.querySelectorAll('[data-jump-exec]').forEach(chip=>{
+      chip.addEventListener('click', ()=> selectCollaborator(chip.dataset.jumpExec));
+    });
   }
+}
+
+function renderOverviewDashboard(){
+  const total = teamData.length;
+  const comAuto = teamData.filter(t=>latestSelf(t)).length;
+  const semAuto = total - comAuto;
+  const concluidos = teamData.filter(t=>{ const m=latestManager(t); return m && m.concluido; }).length;
+  const novas = teamData.filter(hasUnreviewedSelf);
+  const mediasGestora = teamData.map(t=>{ const m=latestManager(t); if(!m||!m.manager_assessment_competencias.length) return null; const vals=m.manager_assessment_competencias.map(c=>c.nota); return vals.reduce((a,b)=>a+b,0)/vals.length; }).filter(v=>v!==null);
+  const mediaGeral = mediasGestora.length ? (mediasGestora.reduce((a,b)=>a+b,0)/mediasGestora.length) : null;
+
+  return `
+    <div class="empty-state" style="text-align:left; display:block;">
+      <div class="mono" style="color:var(--ink-soft); text-transform:uppercase; letter-spacing:.12em; font-size:11px;">Painel geral</div>
+      <h2 style="margin-bottom:4px;">Visão da gestora</h2>
+      <p style="margin-bottom:18px;">Escolha alguém na lista ao lado para ver a autoanálise, preencher a Análise da Gestão, a Mandala de Competências, acionamentos, consumo estratégico e os demais pontos do ciclo. Abaixo, um resumo rápido de toda a equipe.</p>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">Equipe</div><div class="kpi-value">${total}</div></div>
+        <div class="kpi leaf"><div class="kpi-label">Autoanálises recebidas</div><div class="kpi-value leaf">${comAuto}</div></div>
+        <div class="kpi amber"><div class="kpi-label">Ainda sem autoanálise</div><div class="kpi-value amber">${semAuto}</div></div>
+        <div class="kpi rose"><div class="kpi-label">Aguardando análise da gestora</div><div class="kpi-value rose">${novas.length}</div></div>
+        <div class="kpi leaf"><div class="kpi-label">Feedbacks concluídos</div><div class="kpi-value leaf">${concluidos}</div></div>
+        <div class="kpi"><div class="kpi-label">Média geral (mandala)</div><div class="kpi-value">${mediaGeral!==null ? mediaGeral.toFixed(1)+'/3' : '—'}</div></div>
+      </div>
+
+      <div class="gcard">
+        <h2>Autoanálises novas — ainda sem análise da gestora</h2>
+        <div class="sub">Assim que alguém do time envia a autoanálise, aparece aqui na hora (ou clique em "↻ Atualizar dados" na barra lateral para forçar a busca).</div>
+        ${novas.length ? novas.map(t=>`<span class="badge badge-novo" style="cursor:pointer; margin:3px 6px 3px 0;" data-jump-exec="${t.executive.id}">${t.executive.nome}</span>`).join('') : '<div class="insight-empty" style="font-size:13px; color:var(--ink-soft);">Tudo em dia — nenhuma autoanálise pendente de revisão.</div>'}
+      </div>
+
+      <div class="gcard">
+        <h2>Importar dados em lote</h2>
+        <div class="sub">Suba uma planilha com o Registro de acionamentos ou o Consumo estratégico de vários executivos de uma vez, em vez de preencher pessoa por pessoa.</div>
+        <button class="btn btn-primary btn-sm" id="btnJumpImportar" type="button">Ir para Importar dados →</button>
+      </div>
+    </div>`;
 }
 
 function renderTimeline(){
@@ -851,9 +1099,10 @@ function renderTimeline(){
       const done = m && m.concluido;
       const active = activeExec && activeExec.executive.id===t.executive.id;
       const last = latestSelf(t);
+      const nova = hasUnreviewedSelf(t);
       return `<div class="item ${active?'active':''}" data-id="${t.executive.id}">
         <div class="dot ${done?'done':''}"></div>
-        <div><div class="item-name">${t.executive.nome}</div><div class="item-sub">${last?last.quadrante_geral:'sem autoanálise'}</div></div>
+        <div style="flex:1; min-width:0;"><div class="item-name">${t.executive.nome} ${nova?'<span class="badge badge-novo" style="margin-left:4px;">novo</span>':''}</div><div class="item-sub">${last?last.quadrante_geral:'sem autoanálise'}</div></div>
       </div>`;
     }).join('');
   }
@@ -936,10 +1185,21 @@ function renderPersonForm(){
       <div class="chart-label mono" style="margin:0 0 4px;">Progressão — média geral por ciclo</div>
       <div style="background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px;">
         <div class="radar-legend" style="margin-top:0; justify-content:flex-start;">
-          <span><span class="legend-swatch" style="background:#24413B;"></span>Autoanálise</span>
-          <span><span class="legend-swatch" style="background:#A24E68;"></span>Gestora</span>
+          <span><span class="legend-swatch" style="background:#0A2A43;"></span>Autoanálise</span>
+          <span><span class="legend-swatch" style="background:#C0492E;"></span>Gestora</span>
         </div>
         <canvas id="progressChart" height="80"></canvas>
+      </div>
+    </div>
+
+    <div class="block" style="border:none; background:none; box-shadow:none; margin-bottom:8px;">
+      <div class="chart-label mono" style="margin:0 0 4px;">Evolução mensal — acionamentos e consumo (todos os ciclos)</div>
+      <div style="background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px;">
+        <div class="radar-legend" style="margin-top:0; justify-content:flex-start;">
+          <span><span class="legend-swatch" style="background:#1C7EBE;"></span>Acionamentos</span>
+          <span><span class="legend-swatch" style="background:#2C9A66;"></span>Consumo estratégico</span>
+        </div>
+        <canvas id="monthlyEvolutionChart" height="80"></canvas>
       </div>
     </div>
 
@@ -1055,6 +1315,7 @@ function renderPersonForm(){
   renderOpenList('develop','developBody','PONTO','Ex: priorização de demandas, comunicação...');
   renderNextSteps();
   renderProgressChartFor(activeExec);
+  renderMonthlyEvolutionChart(activeExec);
 }
 
 // ① referência (somente leitura)
@@ -1153,7 +1414,7 @@ function renderMandalaPanel(){
     <div class="mandala-sub-title">Mandala de Competências</div>
     <div class="radar-wrap">
       <div style="flex:1; min-width:280px;">${svg}
-        <div class="radar-legend"><span><span class="legend-swatch" style="background:#A24E68;"></span>Avaliação da gestão</span><span><span class="legend-swatch" style="background:#24413B; border:1px dashed #24413B;"></span>Autoanálise (referência)</span></div>
+        <div class="radar-legend"><span><span class="legend-swatch" style="background:#C0492E;"></span>Avaliação da gestão</span><span><span class="legend-swatch" style="background:#0A2A43; border:1px dashed #0A2A43;"></span>Autoanálise (referência)</span></div>
       </div>
       <div class="stats-col">
         <div class="stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)} / 3</strong></div>
@@ -1280,6 +1541,7 @@ let progressChartInstance = null;
 function renderProgressChartFor(t){
   const ctx = document.getElementById('progressChart');
   if(!ctx) return;
+  if(typeof Chart === 'undefined'){ ctx.parentElement.innerHTML = '<p class="empty-block-msg">Gráfico indisponível (biblioteca de gráficos não carregou — verifique a conexão).</p>'; return; }
   const labels = t.assessments.map(a=>a.ciclo);
   const autoData = t.assessments.map(a=>a.media_competencias);
   const gestoraData = t.assessments.map(a=>{
@@ -1289,18 +1551,63 @@ function renderProgressChartFor(t){
     return Math.round((vals.reduce((x,y)=>x+y,0)/vals.length)*10)/10;
   });
   if(progressChartInstance) progressChartInstance.destroy();
+  try{
   progressChartInstance = new Chart(ctx.getContext('2d'), {
     type:'line',
     data:{ labels, datasets:[
-      { label:'Autoanálise', data:autoData, borderColor:'#24413B', backgroundColor:'#24413B', tension:.25, spanGaps:true, pointRadius:4 },
-      { label:'Gestora', data:gestoraData, borderColor:'#A24E68', backgroundColor:'#A24E68', tension:.25, spanGaps:true, pointRadius:4 }
+      { label:'Autoanálise', data:autoData, borderColor:'#0A2A43', backgroundColor:'#0A2A43', tension:.25, spanGaps:true, pointRadius:4 },
+      { label:'Gestora', data:gestoraData, borderColor:'#C0492E', backgroundColor:'#C0492E', tension:.25, spanGaps:true, pointRadius:4 }
     ]},
     options:{ plugins:{legend:{display:false}}, scales:{ y:{min:0,max:3,ticks:{stepSize:1}} } }
   });
+  }catch(e){ console.error('Erro ao montar gráfico de progressão', e); }
+}
+
+// ---- evolução mensal (acionamentos + consumo, juntando todos os ciclos numa linha do tempo) ----
+let monthlyEvolutionChartInstance = null;
+function renderMonthlyEvolutionChart(t){
+  const ctx = document.getElementById('monthlyEvolutionChart');
+  if(!ctx) return;
+  if(typeof Chart === 'undefined'){ ctx.parentElement.innerHTML = '<p class="empty-block-msg">Gráfico indisponível (biblioteca de gráficos não carregou — verifique a conexão).</p>'; return; }
+  const labels = [], acionData = [], consumoData = [];
+  const sortedMAs = t.managerAssessments.slice().sort((a,b)=> String(a.data_avaliacao||'').localeCompare(String(b.data_avaliacao||'')));
+  sortedMAs.forEach(m=>{
+    const ac = (m.manager_acionamentos||[]).slice().sort((a,b)=>a.mes_index-b.mes_index);
+    const cs = (m.manager_consumo||[]).slice().sort((a,b)=>a.mes_index-b.mes_index);
+    for(let i=1;i<=3;i++){
+      const a = ac.find(x=>x.mes_index===i);
+      const c = cs.find(x=>x.mes_index===i);
+      if(!a && !c) continue;
+      if((a && a.quantidade===null) && (c && c.quantidade===null) && !(a&&a.mes) && !(c&&c.mes)) continue;
+      const label = (a&&a.mes) || (c&&c.mes) || (m.ciclo+' · mês '+i);
+      labels.push(label);
+      acionData.push(a && a.quantidade!==null && a.quantidade!==undefined ? a.quantidade : null);
+      consumoData.push(c && c.quantidade!==null && c.quantidade!==undefined ? c.quantidade : null);
+    }
+  });
+  if(!labels.length){
+    ctx.parentElement.innerHTML = '<p class="empty-block-msg">Sem dados de acionamentos ou consumo lançados ainda para esta pessoa (preencha nas seções ⑤ e ⑥, ou importe em lote em "Importar dados").</p>';
+    return;
+  }
+  if(monthlyEvolutionChartInstance) monthlyEvolutionChartInstance.destroy();
+  try{
+    monthlyEvolutionChartInstance = new Chart(ctx.getContext('2d'), {
+      data:{ labels, datasets:[
+        { type:'bar', label:'Acionamentos', data:acionData, backgroundColor:'#1C7EBE', yAxisID:'y' },
+        { type:'line', label:'Consumo estratégico', data:consumoData, borderColor:'#2C9A66', backgroundColor:'#2C9A66', tension:.25, spanGaps:true, pointRadius:4, yAxisID:'y1' }
+      ]},
+      options:{
+        plugins:{ legend:{display:false} },
+        scales:{
+          y:{ beginAtZero:true, title:{display:true, text:'Acionamentos'} },
+          y1:{ beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true, text:'Consumo estratégico'} }
+        }
+      }
+    });
+  }catch(e){ console.error('Erro ao montar gráfico de evolução mensal', e); }
 }
 
 // ---- salvar análise da gestora ----
-document.getElementById('appShell').addEventListener('click', ()=>{}); // no-op placeholder to keep listeners scoped
 async function salvarAnalise(){
   if(!activeSelf){ alert('Este(a) colaborador(a) ainda não preencheu a autoanálise — não é possível vincular a análise da gestora a um ciclo.'); return; }
   const btn = document.getElementById('btnSalvarAnalise');
@@ -1435,6 +1742,172 @@ function printPersonReport(){
 }
 
 /* ======================================================================
+   IMPORTAR DADOS EM LOTE (Acionamentos / Consumo estratégico)
+   ====================================================================== */
+function normalizeName(s){
+  return (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
+}
+function findExecutiveByName(nome){
+  const n = normalizeName(nome);
+  if(!n) return null;
+  let t = teamData.find(x=>normalizeName(x.executive.nome)===n);
+  if(t) return t;
+  t = teamData.find(x=>normalizeName(x.executive.nome).includes(n) || n.includes(normalizeName(x.executive.nome)));
+  return t || null;
+}
+function defaultCiclo(){
+  const d = new Date();
+  const q = Math.floor(d.getMonth()/3)+1;
+  return d.getFullYear()+'-Q'+q;
+}
+async function findOrCreateManagerAssessment(t, ciclo){
+  let ma = t.managerAssessments.find(m=>m.ciclo===ciclo);
+  if(ma) return ma.id;
+  const self = t.assessments.find(a=>a.ciclo===ciclo) || latestSelf(t);
+  const payload = {
+    executive_id: t.executive.id,
+    self_assessment_id: self ? self.id : null,
+    ciclo,
+    data_avaliacao: new Date().toISOString().slice(0,10),
+    concluido: false
+  };
+  const { data, error } = await sb.from('manager_assessments').insert(payload).select('id').single();
+  if(error || !data) throw new Error((error && error.message) || 'Falha ao criar registro para ' + t.executive.nome);
+  // mantém teamData coerente para as próximas linhas da mesma planilha
+  t.managerAssessments.push(Object.assign({ id:data.id, manager_assessment_pontos:[], manager_assessment_competencias:[], manager_acionamentos:[], manager_consumo:[], manager_positives:[], manager_develop:[], manager_next_steps:[] }, payload));
+  return data.id;
+}
+
+function downloadCsv(filename, rows){
+  const csv = rows.map(r=>r.map(v=>{
+    v = (v===null||v===undefined) ? '' : String(v);
+    return /[",;\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+  }).join(';')).join('\r\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderImportador(){
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="quadrant-wrap">
+      <h2>Importar dados em lote</h2>
+      <p>Suba uma planilha (Excel .xlsx/.xls ou .csv) para lançar de uma vez o <strong>Registro de acionamentos</strong> ou o <strong>Consumo estratégico</strong> de vários executivos, em vez de preencher pessoa por pessoa. Se já existir um registro para o mesmo executivo e ciclo, os 3 meses são substituídos pelos da planilha.</p>
+
+      <section class="gcard">
+        <h2>① Registro de acionamentos</h2>
+        <div class="sub">Colunas esperadas: <span class="mono">Executivo, Ciclo, Mes1, Qtd1, Visitas1, Obs1, Mes2, Qtd2, Visitas2, Obs2, Mes3, Qtd3, Visitas3, Obs3</span>. "Ciclo" é opcional — se vazio, usa o ciclo da última autoanálise da pessoa (ou o ciclo atual).</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0;">
+          <button class="btn btn-ghost btn-sm" id="btnModeloAcionamentos" type="button">Baixar modelo (.csv)</button>
+          <input type="file" id="fileAcionamentos" accept=".xlsx,.xls,.csv">
+          <button class="btn btn-primary btn-sm" id="btnImportarAcionamentos" type="button">Processar importação</button>
+        </div>
+        <div id="msgAcionamentos"></div>
+      </section>
+
+      <section class="gcard">
+        <h2>② Consumo estratégico</h2>
+        <div class="sub">Colunas esperadas: <span class="mono">Executivo, Ciclo, Mes1, Qtd1, Obs1, Mes2, Qtd2, Obs2, Mes3, Qtd3, Obs3</span>. "Ciclo" é opcional, mesma regra acima.</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0;">
+          <button class="btn btn-ghost btn-sm" id="btnModeloConsumo" type="button">Baixar modelo (.csv)</button>
+          <input type="file" id="fileConsumo" accept=".xlsx,.xls,.csv">
+          <button class="btn btn-primary btn-sm" id="btnImportarConsumo" type="button">Processar importação</button>
+        </div>
+        <div id="msgConsumo"></div>
+      </section>
+    </div>`;
+
+  document.getElementById('btnModeloAcionamentos').addEventListener('click', ()=>{
+    downloadCsv('modelo_acionamentos.csv', [
+      ['Executivo','Ciclo','Mes1','Qtd1','Visitas1','Obs1','Mes2','Qtd2','Visitas2','Obs2','Mes3','Qtd3','Visitas3','Obs3'],
+      teamData[0] ? [teamData[0].executive.nome,'2026-Q3','Julho','12','4','','Agosto','15','5','','Setembro','10','3',''] : ['Nome do executivo','2026-Q3','Julho','12','4','','Agosto','15','5','','Setembro','10','3','']
+    ]);
+  });
+  document.getElementById('btnModeloConsumo').addEventListener('click', ()=>{
+    downloadCsv('modelo_consumo.csv', [
+      ['Executivo','Ciclo','Mes1','Qtd1','Obs1','Mes2','Qtd2','Obs2','Mes3','Qtd3','Obs3'],
+      teamData[0] ? [teamData[0].executive.nome,'2026-Q3','Julho','120','','Agosto','135','','Setembro','128',''] : ['Nome do executivo','2026-Q3','Julho','120','','Agosto','135','','Setembro','128','']
+    ]);
+  });
+
+  document.getElementById('btnImportarAcionamentos').addEventListener('click', ()=>processImportFile('fileAcionamentos','msgAcionamentos','acionamentos'));
+  document.getElementById('btnImportarConsumo').addEventListener('click', ()=>processImportFile('fileConsumo','msgConsumo','consumo'));
+}
+
+function readSheetRows(file){
+  return new Promise((resolve, reject)=>{
+    if(typeof XLSX === 'undefined'){ reject(new Error('Biblioteca de leitura de planilhas não carregou (verifique a conexão) — tente novamente.')); return; }
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+        resolve(rows);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = ()=>reject(new Error('Não foi possível ler o arquivo.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function processImportFile(inputId, msgId, tipo){
+  const input = document.getElementById(inputId);
+  const msgEl = document.getElementById(msgId);
+  const file = input.files && input.files[0];
+  if(!file){ msgEl.innerHTML = '<div class="error-msg" style="display:block;">Selecione um arquivo primeiro.</div>'; return; }
+  msgEl.innerHTML = '<div class="sub">Processando...</div>';
+
+  let rows;
+  try{ rows = await readSheetRows(file); }
+  catch(err){ msgEl.innerHTML = `<div class="error-msg" style="display:block;">${escapeHtml(err.message||String(err))}</div>`; return; }
+
+  let ok = 0; const errors = [];
+  for(const row of rows){
+    const nomeRaw = row['Executivo'] || row['executivo'] || row['EXECUTIVO'] || '';
+    const nome = String(nomeRaw).trim();
+    if(!nome) continue;
+    const t = findExecutiveByName(nome);
+    if(!t){ errors.push('Executivo não encontrado: "'+nome+'" — cadastre a pessoa antes de importar.'); continue; }
+    const ciclo = String(row['Ciclo']||row['ciclo']||'').trim() || (latestSelf(t)?latestSelf(t).ciclo:defaultCiclo());
+    try{
+      const maId = await findOrCreateManagerAssessment(t, ciclo);
+      if(tipo==='acionamentos'){
+        await sb.from('manager_acionamentos').delete().eq('manager_assessment_id', maId);
+        const recs = [1,2,3].map(i=>({
+          manager_assessment_id: maId, mes_index: i,
+          mes: String(row['Mes'+i]||'').trim()||null,
+          quantidade: row['Qtd'+i]!==undefined && row['Qtd'+i]!=='' ? Number(row['Qtd'+i]) : null,
+          visitas: row['Visitas'+i]!==undefined && row['Visitas'+i]!=='' ? Number(row['Visitas'+i]) : null,
+          observacoes: String(row['Obs'+i]||'').trim()||null
+        })).filter(r=>r.mes||r.quantidade!==null||r.visitas!==null||r.observacoes);
+        if(recs.length) await sb.from('manager_acionamentos').insert(recs);
+      } else {
+        await sb.from('manager_consumo').delete().eq('manager_assessment_id', maId);
+        const recs = [1,2,3].map(i=>({
+          manager_assessment_id: maId, mes_index: i,
+          mes: String(row['Mes'+i]||'').trim()||null,
+          quantidade: row['Qtd'+i]!==undefined && row['Qtd'+i]!=='' ? Number(row['Qtd'+i]) : null,
+          observacoes: String(row['Obs'+i]||'').trim()||null
+        })).filter(r=>r.mes||r.quantidade!==null||r.observacoes);
+        if(recs.length) await sb.from('manager_consumo').insert(recs);
+      }
+      ok++;
+    }catch(err){ errors.push(nome+': '+(err.message||String(err))); }
+  }
+
+  await loadTeam(false);
+  currentView='importar'; setActiveTab(); renderImportador();
+  const resultEl = document.getElementById(msgId);
+  resultEl.innerHTML = `<div class="ok-msg" style="display:block;">${ok} registro(s) importado(s) com sucesso.</div>` +
+    (errors.length ? `<div class="error-msg" style="display:block;">${errors.length} com problema:<br>${errors.map(e=>escapeHtml(e)).join('<br>')}</div>` : '');
+}
+
+/* ======================================================================
    QUADRO GERENCIAL
    ====================================================================== */
 const QUAD_INFO = { 1:{label:'Quadrante 1', color:'var(--sage)', bg:'var(--sage-bg)'}, 2:{label:'Quadrante 2', color:'var(--amber)', bg:'var(--amber-bg)'}, 3:{label:'Quadrante 3', color:'var(--slate)', bg:'var(--slate-bg)'} };
@@ -1534,7 +2007,7 @@ function renderCompetMandala(filterId){
     const diff = (s!=null && stat.avg!==null) ? (s-stat.avg) : null;
     return `<tr><td>${c[0]}</td><td style="text-align:center;">${s?`<span class="stat-badge s${s}">${s}</span>`:'<span class="stat-badge na">—</span>'}</td><td style="text-align:center;">${stat.avg!==null?stat.avg.toFixed(1):'—'}</td><td style="text-align:center;">${diff!==null?((diff>0?'+':'')+diff.toFixed(1)):'—'}</td><td style="text-align:center;">${tierBadge(stat.tier)}</td></tr>`;
   }).join('');
-  el.innerHTML = `<h3 style="font-family:'Fraunces',serif; font-size:16px; margin:0 0 10px; color:var(--pine-dark);">${t.executive.nome}</h3>
+  el.innerHTML = `<h3 style="font-family:'Manrope',sans-serif; font-size:16px; margin:0 0 10px; color:var(--pine-dark);">${t.executive.nome}</h3>
     <table class="rp-compare-table"><thead><tr><th>Competência</th><th>Nota (gestão)</th><th>Média da equipe</th><th>Diferença</th><th>Situação na equipe</th></tr></thead><tbody>${rows}</tbody></table>${rankingHtml}`;
 }
 </script>
