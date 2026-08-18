@@ -192,7 +192,7 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .result-legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-soft); }
 .result-legend span{ display:inline-flex; align-items:center; gap:6px; }
 .legend-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
-.legend-dot.l1{ background:var(--sage); } .legend-dot.l2{ background:var(--amber); } .legend-dot.l3{ background:var(--slate); }
+.legend-dot.l1{ background:var(--sage); } .legend-dot.l2{ background:var(--amber); } .legend-dot.l3{ background:var(--slate); } .legend-dot.l4{ background:var(--lilac); }
 .result-empty{ font-size:12.5px; color:var(--ink-soft); font-style:italic; }
 
 /* competency score rows */
@@ -201,13 +201,14 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .comp-info{ flex:1; min-width:0; }
 .comp-name{ font-weight:600; font-size:13.5px; display:block; }
 .comp-desc{ font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
-.score-buttons{ display:flex; gap:6px; flex:none; }
-.score-btn{ width:74px; padding:7px 4px 6px; border-radius:8px; border:1.5px solid var(--line); background:#fff; cursor:pointer; text-align:center; color:var(--ink-soft); }
+.score-buttons{ display:flex; gap:6px; flex:none; flex-wrap:wrap; max-width:340px; }
+.score-btn{ width:80px; padding:7px 4px 6px; border-radius:8px; border:1.5px solid var(--line); background:#fff; cursor:pointer; text-align:center; color:var(--ink-soft); }
 .score-btn .num{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:700; font-size:15px; display:block; }
 .score-btn .cap{ display:block; font-size:8.3px; font-weight:500; margin-top:2px; line-height:1.15; }
 .score-btn[data-score="1"].active{ background:var(--amber-bg); border-color:var(--amber); color:#5C3E13; }
 .score-btn[data-score="2"].active{ background:var(--slate-bg); border-color:var(--slate); color:#2C4256; }
 .score-btn[data-score="3"].active{ background:var(--sage-bg); border-color:var(--sage); color:#33513F; }
+.score-btn[data-score="4"].active{ background:var(--lilac-bg); border-color:var(--lilac); color:#3E2E5C; }
 .score-btn.readonly{ cursor:default; }
 
 /* mandala radar */
@@ -233,6 +234,11 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .month-row{ display:grid; grid-template-columns:120px 150px 1fr; gap:10px; align-items:end; padding:10px 0; border-bottom:1px solid var(--line); }
 .month-row:last-child{ border-bottom:none; }
 .month-row.wide4{ grid-template-columns:110px 110px 100px 1fr; }
+.mensal-row{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; padding:10px 0; border-bottom:1px solid var(--line); }
+.mensal-row:last-child{ border-bottom:none; }
+.mensal-row .field{ min-width:90px; }
+.mensal-row .field.grow{ flex:1 1 200px; min-width:160px; }
+.mensal-row .btn-remove{ margin-left:auto; align-self:center; }
 .field{ flex:1; display:flex; flex-direction:column; gap:4px; }
 .chart-label{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-top:14px; margin-bottom:4px; }
 .bar-chart{ display:flex; align-items:flex-end; gap:14px; height:90px; margin-top:6px; padding:0 6px; }
@@ -370,8 +376,8 @@ table.rp-compare-table th{ background:#F0F5F9; font-weight:600; }
   </section>
 
   <section class="block self">
-    <div class="block-head"><h3>③ Autoanálise — Mandala de Competências</h3></div>
-    <div class="block-sub">Dê uma nota de 1 a 3 para cada competência.</div>
+    <div class="block-head"><h3>③ Nova Autoanálise — Mandala de Competências</h3></div>
+    <div class="block-sub">Para cada competência, escolha o nível que melhor representa como você se percebe hoje: Em construção, Em desenvolvimento, Atende ao esperado ou Referência.</div>
     <div class="block-body" id="selfScoreBody"></div>
   </section>
 
@@ -505,6 +511,7 @@ class RestQuery{
   eq(col, val){ this.qs.push(encodeURIComponent(col) + '=eq.' + encodeURIComponent(val)); return this; }
   ilike(col, val){ this.qs.push(encodeURIComponent(col) + '=ilike.' + encodeURIComponent(val)); return this; }
   insert(rows){ this.method = 'POST'; this.body = rows; this.extraHeaders['Prefer'] = 'return=representation'; return this; }
+  upsert(rows, onConflict){ this.method = 'POST'; this.body = rows; this.extraHeaders['Prefer'] = 'resolution=merge-duplicates,return=representation'; if(onConflict) this.qs.push('on_conflict=' + encodeURIComponent(onConflict)); return this; }
   update(obj){ this.method = 'PATCH'; this.body = obj; this.extraHeaders['Prefer'] = 'return=representation'; return this; }
   delete(){ this.method = 'DELETE'; this.extraHeaders['Prefer'] = 'return=minimal'; return this; }
   single(){ this._single = true; return this; }
@@ -632,11 +639,45 @@ const COMPETENCIAS = [
 ];
 const SCORE_CAPS = { 1:"Em desenvolvimento", 2:"Consistente", 3:"Referência" };
 const LEVEL_LABELS = { 1:"Quadrante 1", 2:"Quadrante 2", 3:"Quadrante 3" };
+
+// ---- NOVA Autoanálise — Mandala de Competências (escala 1-4) ----
+const DESEMPENHO = [
+  ["Empatia","Escuta o time, entende diferentes perspectivas e apoia de forma genuína","Empatia"],
+  ["Comunicação Assertiva","Dá direcionamento claro, direto e respeitoso","Comunicação"],
+  ["Motivação","Demonstra energia, engaja o time e conecta com propósito","Motivação"],
+  ["Flexibilidade","Se adapta, escuta ideias e promove colaboração","Flexibilidade"],
+  ["Compromisso social/ambiental","Considera impactos e reforça responsabilidade coletiva","Compr. Social/Amb."],
+  ["Respeito à diversidade","Promove inclusão e respeita diferenças","Resp. Diversidade"],
+  ["Senso de dono","Assume responsabilidade por resultados e recursos","Senso de Dono"],
+  ["Ética e integridade","Age corretamente, cumpre regras e corrige desvios","Ética/Integr."],
+  ["Gestão de pessoas","Desenvolve, orienta e acompanha a equipe","Gestão"],
+  ["Autorresponsabilidade","Assume erros e busca evolução contínua","Autorresp."],
+  ["Foco na solução","Resolve problemas com proatividade e visão preventiva","Foco na Solução"],
+];
+const DESEMPENHO_LEVELS = {
+  1: { label:"Em construção", desc:"A competência ainda está em processo de desenvolvimento e precisa ser mais presente na atuação." },
+  2: { label:"Em desenvolvimento", desc:"A competência já é demonstrada, mas ainda existem oportunidades de evolução e maior consistência." },
+  3: { label:"Atende ao esperado", desc:"Demonstra a competência de forma consistente, dentro do esperado para a função." },
+  4: { label:"Referência", desc:"Demonstra a competência em alto nível e se destaca como referência para o time." },
+};
+function desempenhoStats(scoresObj){
+  const vals = DESEMPENHO.map(c=>scoresObj[c[0]]).filter(v=>v!==null && v!==undefined && v!=='');
+  const answered = vals.length;
+  const avg = answered ? vals.reduce((a,b)=>a+Number(b),0)/answered : 0;
+  return { answered, total:DESEMPENHO.length, avg };
+}
+// meses do histórico contínuo (acionamentos_mensal / consumo_mensal) — independentes de ciclo
+const MES_LABEL_BY_INDEX = {1:'Jan',2:'Fev',3:'Mar',4:'Abr',5:'Mai',6:'Jun',7:'Jul',8:'Ago',9:'Set',10:'Out',11:'Nov',12:'Dez'};
+const MES_MAP = {jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+function mesIndexFromLabel(label){
+  const n = normalizeName(label).slice(0,3);
+  return MES_MAP[n] || null;
+}
 const ASPIRATION_TIMEFRAMES = ["Até 6 meses","6 meses a 1 ano","1 a 2 anos","Mais de 2 anos"];
 const NEXT_CYCLE_OPTIONS = ["Me desenvolver na minha cadeira atual","Analista Júnior","Analista Pleno","Analista Sênior","Supervisão","Coordenação"];
 
 function escapeHtml(s){ return (s||'').toString().replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function escapeAttr(s){ return (s||'').toString().replace(/"/g,'&quot;'); }
+function escapeAttr(s){ return (s===null||s===undefined?'':s).toString().replace(/"/g,'&quot;'); }
 
 function picksProfile(picksObj){
   const counts = {1:0,2:0,3:0};
@@ -756,13 +797,13 @@ function initTeamForm(){
   renderTeamPicksResult();
 
   const scoreBody = document.getElementById('selfScoreBody');
-  scoreBody.innerHTML = COMPETENCIAS.map(c=>{
+  scoreBody.innerHTML = DESEMPENHO.map(c=>{
     const nome=c[0], desc=c[1];
     return `
     <div class="comp-row">
       <div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
       <div class="score-buttons" data-comp="${escapeAttr(nome)}">
-        ${[1,2,3].map(n=>`<button type="button" class="score-btn" data-score="${n}"><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}
+        ${[1,2,3,4].map(n=>`<button type="button" class="score-btn" data-score="${n}" title="${escapeAttr(DESEMPENHO_LEVELS[n].desc)}"><span class="num">${n}</span><span class="cap">${DESEMPENHO_LEVELS[n].label}</span></button>`).join('')}
       </div>
     </div>`;
   }).join('');
@@ -833,8 +874,8 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
   if(!nome){ errorEl.textContent='Informe seu nome completo.'; errorEl.style.display='block'; return; }
   const pontosRespondidos = CRITERIA.filter(c=>teamPicks[c[0]]).length;
   if(pontosRespondidos < CRITERIA.length){ errorEl.textContent='Responda todos os 12 pontos comportamentais.'; errorEl.style.display='block'; return; }
-  const compRespondidas = COMPETENCIAS.filter(c=>teamScores[c[0]]).length;
-  if(compRespondidas < COMPETENCIAS.length){ errorEl.textContent='Dê nota para todas as 11 competências.'; errorEl.style.display='block'; return; }
+  const compRespondidas = DESEMPENHO.filter(c=>teamScores[c[0]]).length;
+  if(compRespondidas < DESEMPENHO.length){ errorEl.textContent='Dê uma nota para todas as 11 competências da Mandala.'; errorEl.style.display='block'; return; }
 
   const btn = document.getElementById('btnEnviar');
   btn.disabled = true; btn.textContent = 'Enviando...';
@@ -852,7 +893,7 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
     }
 
     const prof = picksProfile(teamPicks);
-    const stat = scoreStats(teamScores);
+    const stat = desempenhoStats(teamScores);
     const media = Math.round(stat.avg*10)/10;
 
     const { data: sa, error: saErr } = await sb.from('self_assessments').insert({
@@ -862,7 +903,7 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
       cargo_no_preenchimento: cargo || null,
       quadrante_geral: prof.predominant,
       respondidos_pontos: CRITERIA.length,
-      media_competencias: media,
+      media_desempenho: media,
       aspiracao_objetivo: document.getElementById('teamAspGoal').value.trim() || null,
       aspiracao_prazo: document.getElementById('teamAspTimeframe').value || null,
       aspiracao_proximo_ciclo: document.getElementById('teamAspNextCycle').value || null
@@ -870,10 +911,10 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
     if(saErr) throw saErr;
 
     const pontosRows = CRITERIA.map(c=>({ self_assessment_id: sa.id, ponto:c[0], quadrante: teamPicks[c[0]] }));
-    const compRows = COMPETENCIAS.map(c=>({ self_assessment_id: sa.id, competencia:c[0], nota: teamScores[c[0]] }));
+    const desempenhoRows = DESEMPENHO.map(c=>({ self_assessment_id: sa.id, comportamento:c[0], nota: teamScores[c[0]] }));
     const [{error:pErr}, {error:cErr}] = await Promise.all([
       sb.from('self_assessment_pontos').insert(pontosRows),
-      sb.from('self_assessment_competencias').insert(compRows)
+      sb.from('self_assessment_desempenho').insert(desempenhoRows)
     ]);
     if(pErr) throw pErr;
     if(cErr) throw cErr;
@@ -893,10 +934,12 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
    TELA DA GESTORA
    ====================================================================== */
 let currentUser = null;
-let teamData = [];        // [{executive, assessments:[...], managerAssessments:[...]}]
+let teamData = [];        // [{executive, assessments:[...], managerAssessments:[...], mensalAcionamentos:[...], mensalConsumo:[...]}]
 let activeExec = null;
 let activeSelf = null;    // self_assessment atualmente selecionado
 let draft = null;         // rascunho editável da análise da gestora
+let selfDraft = null;     // rascunho editável da autoanálise (①③⑦ + nova mandala), agora corrigível pela gestora
+let mensalDraft = null;   // rascunho editável do histórico mensal contínuo (acionamentos_mensal / consumo_mensal)
 let currentView = 'equipe';
 
 async function checkSession(){
@@ -973,16 +1016,22 @@ async function loadTeam(silent){
   }
   const execs = execsRes.data;
   const { data: assessments } = await sb.from('self_assessments')
-    .select('*, self_assessment_pontos(*), self_assessment_competencias(*)')
+    .select('*, self_assessment_pontos(*), self_assessment_competencias(*), self_assessment_desempenho(*)')
     .order('data_preenchimento', { ascending:true });
   const { data: managerAssessments } = await sb.from('manager_assessments')
     .select('*, manager_assessment_pontos(*), manager_assessment_competencias(*), manager_acionamentos(*), manager_consumo(*), manager_positives(*), manager_develop(*), manager_next_steps(*)')
     .order('data_avaliacao', { ascending:true });
+  // histórico mensal contínuo (independente de ciclo) — tabelas novas, aditivas;
+  // se a migração ainda não foi rodada, o select falha silenciosamente e cai em [].
+  const { data: mensalAcion } = await sb.from('acionamentos_mensal').select('*');
+  const { data: mensalCons } = await sb.from('consumo_mensal').select('*');
 
   teamData = (execs||[]).map(ex=>({
     executive: ex,
     assessments: (assessments||[]).filter(a=>a.executive_id===ex.id),
-    managerAssessments: (managerAssessments||[]).filter(m=>m.executive_id===ex.id)
+    managerAssessments: (managerAssessments||[]).filter(m=>m.executive_id===ex.id),
+    mensalAcionamentos: (mensalAcion||[]).filter(m=>m.executive_id===ex.id).sort((a,b)=> (a.ano-b.ano) || (a.mes_index-b.mes_index)),
+    mensalConsumo: (mensalCons||[]).filter(m=>m.executive_id===ex.id).sort((a,b)=> (a.ano-b.ano) || (a.mes_index-b.mes_index))
   }));
 
   const totalSelf = (assessments||[]).length;
@@ -1125,6 +1174,32 @@ function emptyDraft(){
     maId: null
   };
 }
+
+// draft para as seções "da autoanálise" (①③⑦ + nova mandala) que agora
+// também podem ser editadas/corrigidas pela gestora
+function emptySelfDraft(){
+  const selfPicks={}, selfScoresLegacy={}, selfDesempenho={};
+  CRITERIA.forEach(c=>selfPicks[c[0]]=null);
+  COMPETENCIAS.forEach(c=>selfScoresLegacy[c[0]]=null);
+  DESEMPENHO.forEach(c=>selfDesempenho[c[0]]=null);
+  return {
+    selfPicks, selfScoresLegacy, selfDesempenho,
+    selfAspiracaoObjetivo:'', selfAspiracaoPrazo:'', selfAspiracaoProximoCiclo:'',
+    saId: null
+  };
+}
+function selfDraftFromAssessment(sa){
+  const d = emptySelfDraft();
+  if(!sa) return d;
+  (sa.self_assessment_pontos||[]).forEach(p=>d.selfPicks[p.ponto]=p.quadrante);
+  (sa.self_assessment_competencias||[]).forEach(c=>d.selfScoresLegacy[c.competencia]=c.nota);
+  (sa.self_assessment_desempenho||[]).forEach(c=>d.selfDesempenho[c.comportamento]=c.nota);
+  d.selfAspiracaoObjetivo = sa.aspiracao_objetivo || '';
+  d.selfAspiracaoPrazo = sa.aspiracao_prazo || '';
+  d.selfAspiracaoProximoCiclo = sa.aspiracao_proximo_ciclo || '';
+  d.saId = sa.id;
+  return d;
+}
 function draftFromManager(ma){
   const d = emptyDraft();
   if(!ma) return d;
@@ -1153,12 +1228,20 @@ function draftFromManager(ma){
   return d;
 }
 
+function mensalDraftFromExec(t){
+  return {
+    acionamentos: (t.mensalAcionamentos||[]).map(m=>({id:m.id, ano:m.ano, mes_index:m.mes_index, quantidade:m.quantidade??'', meta:m.meta??'', visitas:m.visitas??'', meta_visitas:m.meta_visitas??''})),
+    consumo: (t.mensalConsumo||[]).map(m=>({id:m.id, ano:m.ano, mes_index:m.mes_index, quantidade:m.quantidade??'', meta:m.meta??'', observacoes:m.observacoes??''}))
+  };
+}
 function selectCollaborator(execId){
   activeExec = teamData.find(t=>t.executive.id===execId);
   if(!activeExec) return;
   activeSelf = latestSelf(activeExec);
   const ma = activeSelf ? managerForSelf(activeExec, activeSelf.id) : latestManager(activeExec);
   draft = draftFromManager(ma);
+  selfDraft = selfDraftFromAssessment(activeSelf);
+  mensalDraft = mensalDraftFromExec(activeExec);
   renderTimeline();
   renderPersonForm();
 }
@@ -1204,8 +1287,8 @@ function renderPersonForm(){
     </div>
 
     <section class="block critself">
-      <div class="block-head"><h3>① Autoanálise — Pontos Comportamentais</h3></div>
-      <div class="block-sub">Como o(a) próprio(a) colaborador(a) se percebe (referência, somente leitura).</div>
+      <div class="block-head"><h3>① Autoanálise — Pontos Comportamentais <span class="badge badge-info" style="margin-left:8px;">Editável pela gestora</span></h3></div>
+      <div class="block-sub">Como o(a) colaborador(a) se percebeu ao preencher. Você pode ajustar/corrigir diretamente aqui, se necessário.</div>
       <div class="block-body" id="critSelfRefBody"></div>
       <div style="padding:0 18px 18px;" id="critSelfRefResult"></div>
     </section>
@@ -1218,9 +1301,16 @@ function renderPersonForm(){
     </section>
 
     <section class="block self">
-      <div class="block-head"><h3>③ Autoanálise — Mandala de Competências</h3></div>
-      <div class="block-sub">Notas do(a) próprio(a) colaborador(a) (referência, somente leitura).</div>
+      <div class="block-head"><h3>③ Autoanálise — Mandala de Competências (escala anterior) <span class="badge badge-info" style="margin-left:8px;">Editável pela gestora</span></h3></div>
+      <div class="block-sub">Notas do(a) colaborador(a) na escala original de 1 a 3, preservada para manter o histórico dos ciclos anteriores.</div>
       <div class="block-body" id="selfScoreRefBody"></div>
+    </section>
+
+    <section class="block self">
+      <div class="block-head"><h3>③b Nova Autoanálise — Mandala de Competências (Desempenho) <span class="badge badge-info" style="margin-left:8px;">Editável pela gestora</span></h3></div>
+      <div class="block-sub">Nova escala de 1 (Em construção) a 4 (Referência), preenchida pelo(a) colaborador(a) a partir deste ciclo — não substitui a mandala anterior, as duas ficam registradas.</div>
+      <div class="block-body" id="selfDesempenhoBody"></div>
+      <div style="padding:0 18px 18px;" id="selfDesempenhoResult"></div>
     </section>
 
     <section class="block manager">
@@ -1232,19 +1322,39 @@ function renderPersonForm(){
 
     <section class="block acionamentos">
       <div class="block-head"><h3>⑤ Registro de acionamentos</h3></div>
-      <div class="block-sub">Histórico dos últimos 3 meses.</div>
+      <div class="block-sub">Histórico dos últimos 3 meses (por ciclo).</div>
       <div class="block-body" id="acionamentosBody"></div>
     </section>
 
     <section class="block consumo">
       <div class="block-head"><h3>⑥ Consumo estratégico</h3></div>
-      <div class="block-sub">Ações de consumo estratégico desenvolvidas nos últimos 3 meses.</div>
+      <div class="block-sub">Ações de consumo estratégico desenvolvidas nos últimos 3 meses (por ciclo).</div>
       <div class="block-body" id="consumoBody"></div>
     </section>
 
+    <section class="block acionamentos">
+      <div class="block-head"><h3>⑤b Acionamentos e visitas — histórico mensal</h3></div>
+      <div class="block-sub">Linha do tempo contínua por mês/ano, independente do ciclo — alimentada pela planilha real importada em "Importar dados" ou editável diretamente aqui. Nada aqui substitui os registros por ciclo acima.</div>
+      <div class="block-body" id="mensalAcionamentosBody"></div>
+      <div style="padding:0 18px 18px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" id="btnAddMesAcionamentos" type="button">+ adicionar mês</button>
+        <button class="btn btn-primary btn-sm" id="btnSalvarMensalAcionamentos" type="button">Salvar histórico de acionamentos</button>
+      </div>
+    </section>
+
+    <section class="block consumo">
+      <div class="block-head"><h3>⑥b Consumo estratégico — histórico mensal</h3></div>
+      <div class="block-sub">Linha do tempo contínua por mês/ano, independente do ciclo — alimentada pela planilha real importada em "Importar dados" ou editável diretamente aqui.</div>
+      <div class="block-body" id="mensalConsumoBody"></div>
+      <div style="padding:0 18px 18px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" id="btnAddMesConsumo" type="button">+ adicionar mês</button>
+        <button class="btn btn-primary btn-sm" id="btnSalvarMensalConsumo" type="button">Salvar histórico de consumo</button>
+      </div>
+    </section>
+
     <section class="block aspiration">
-      <div class="block-head"><h3>⑦ Projeção profissional — aonde quer chegar</h3></div>
-      <div class="block-sub">Preenchida pelo(a) próprio(a) colaborador(a) (referência).</div>
+      <div class="block-head"><h3>⑦ Projeção profissional — aonde quer chegar <span class="badge badge-info" style="margin-left:8px;">Editável pela gestora</span></h3></div>
+      <div class="block-sub">Preenchida pelo(a) colaborador(a); você pode complementar ou corrigir.</div>
       <div class="block-body" id="aspirationRefBody"></div>
     </section>
 
@@ -1290,6 +1400,7 @@ function renderPersonForm(){
       activeSelf = cycles.find(c=>c.id===e.target.value);
       const ma = managerForSelf(activeExec, activeSelf.id);
       draft = draftFromManager(ma);
+      selfDraft = selfDraftFromAssessment(activeSelf);
       renderPersonForm();
     });
   } else {
@@ -1306,10 +1417,12 @@ function renderPersonForm(){
   renderCritSelfReference();
   renderCritManagerEditable();
   renderSelfScoreReference();
+  renderSelfDesempenhoEditable();
   renderManagerScoreEditable();
   renderMandalaPanel();
   renderMonthBlock('acionamentos','acionamentosBody', ['mes','quantidade','visitas','observacoes'], true);
   renderMonthBlock('consumo','consumoBody', ['mes','quantidade','observacoes'], false);
+  renderMensalSections();
   renderAspirationReference();
   renderOpenList('positives','positivesBody','PONTO','Ex: qualidade das entregas, proatividade...');
   renderOpenList('develop','developBody','PONTO','Ex: priorização de demandas, comunicação...');
@@ -1318,22 +1431,42 @@ function renderPersonForm(){
   renderMonthlyEvolutionChart(activeExec);
 }
 
-// ① referência (somente leitura)
+// ① autoanálise — agora editável/corrigível pela gestora (grava em selfDraft.selfPicks)
 function renderCritSelfReference(){
   const body = document.getElementById('critSelfRefBody');
-  const picks = {}; if(activeSelf) activeSelf.self_assessment_pontos.forEach(p=>picks[p.ponto]=p.quadrante);
-  body.innerHTML = CRITERIA.map(c=>{
-    const nome=c[0], val=picks[nome];
-    return `<div class="self-row"><span class="self-crit-name">${nome}</span>
-      <div class="pick-grid">${[1,2,3].map(lvl=>`<div class="pick-card readonly ${val===lvl?'active':''}" data-level="${lvl}"><span class="pick-level">${LEVEL_LABELS[lvl]}</span><span class="pick-desc">${c[lvl]}</span></div>`).join('')}</div></div>`;
-  }).join('');
   const el = document.getElementById('critSelfRefResult');
-  if(!activeSelf){ el.innerHTML = '<div class="result-panel"><div class="result-empty">Sem autoanálise registrada ainda.</div></div>'; return; }
-  const prof = picksProfile(picks);
+  if(!activeSelf){
+    body.innerHTML = '<div class="empty-block-msg">Ainda sem autoanálise registrada para este ciclo.</div>';
+    el.innerHTML = '';
+    return;
+  }
+  body.innerHTML = CRITERIA.map(c=>{
+    const nome=c[0];
+    return `<div class="self-row"><span class="self-crit-name">${nome}</span>
+      <div class="pick-grid" data-ponto="${escapeAttr(nome)}">${[1,2,3].map(lvl=>`<div class="pick-card ${selfDraft.selfPicks[nome]===lvl?'active':''}" data-level="${lvl}"><span class="pick-level">${LEVEL_LABELS[lvl]}</span><span class="pick-desc">${c[lvl]}</span></div>`).join('')}</div></div>`;
+  }).join('');
+  body.querySelectorAll('.pick-grid').forEach(grid=>{
+    const ponto = grid.dataset.ponto;
+    grid.querySelectorAll('.pick-card').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        const lvl = Number(card.dataset.level);
+        selfDraft.selfPicks[ponto] = selfDraft.selfPicks[ponto]===lvl ? null : lvl;
+        grid.querySelectorAll('.pick-card').forEach(c2=>c2.classList.toggle('active', Number(c2.dataset.level)===selfDraft.selfPicks[ponto]));
+        renderCritSelfResult();
+      });
+    });
+  });
+  renderCritSelfResult();
+}
+function renderCritSelfResult(){
+  const el = document.getElementById('critSelfRefResult');
+  if(!activeSelf){ el.innerHTML = ''; return; }
+  const prof = picksProfile(selfDraft.selfPicks);
+  if(!prof.answered){ el.innerHTML = '<div class="result-panel"><div class="result-empty">Assim que houver pelo menos um ponto marcado, o resultado aparece aqui.</div></div>'; return; }
   const segs = [1,2,3].map(l=>{ const pct=(prof.counts[l]/prof.total)*100; return pct>0?`<div class="result-bar-seg l${l}" style="width:${pct}%"></div>`:''; }).join('');
-  el.innerHTML = `<div class="result-panel"><div class="result-title">Resultado da autoanálise: ${activeSelf.quadrante_geral}</div>
+  el.innerHTML = `<div class="result-panel"><div class="result-title">Resultado da autoanálise: ${prof.predominant||'—'}</div>
     <div class="result-bar-track">${segs}</div>
-    <div class="result-legend">${[1,2,3].map(l=>`<span><span class="legend-dot l${l}"></span>${LEVEL_LABELS[l]}: ${prof.counts[l]}/${prof.total}</span>`).join('')}</div></div>`;
+    <div class="result-legend">${[1,2,3].map(l=>`<span><span class="legend-dot l${l}"></span>${LEVEL_LABELS[l]}: ${prof.counts[l]}/${prof.total}</span>`).join('')} <span>Respondidos: ${prof.answered}/${prof.total}</span></div></div>`;
 }
 
 // ② editável pela gestora
@@ -1367,15 +1500,57 @@ function renderCritManagerResult(){
     <div class="result-legend">${[1,2,3].map(l=>`<span><span class="legend-dot l${l}"></span>${LEVEL_LABELS[l]}: ${prof.counts[l]}/${prof.total}</span>`).join('')} <span>Respondidos: ${prof.answered}/${prof.total}</span></div></div>`;
 }
 
-// ③ referência (somente leitura)
+// ③ mandala antiga da autoanálise — agora editável/corrigível pela gestora (grava em selfDraft.selfScoresLegacy)
 function renderSelfScoreReference(){
   const body = document.getElementById('selfScoreRefBody');
-  const scores = {}; if(activeSelf) activeSelf.self_assessment_competencias.forEach(c=>scores[c.competencia]=c.nota);
+  if(!activeSelf){ body.innerHTML = '<div class="empty-block-msg">Ainda sem autoanálise registrada para este ciclo.</div>'; return; }
   body.innerHTML = COMPETENCIAS.map(c=>{
-    const nome=c[0], desc=c[1], val=scores[nome];
+    const nome=c[0], desc=c[1];
     return `<div class="comp-row"><div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
-      <div class="score-buttons">${[1,2,3].map(n=>`<button type="button" class="score-btn readonly ${val===n?'active':''}" disabled><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}</div></div>`;
+      <div class="score-buttons" data-comp="${escapeAttr(nome)}">${[1,2,3].map(n=>`<button type="button" class="score-btn ${selfDraft.selfScoresLegacy[nome]===n?'active':''}" data-score="${n}"><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}</div></div>`;
   }).join('');
+  body.querySelectorAll('.score-buttons').forEach(group=>{
+    const comp = group.dataset.comp;
+    group.querySelectorAll('.score-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const n = Number(btn.dataset.score);
+        selfDraft.selfScoresLegacy[comp] = selfDraft.selfScoresLegacy[comp]===n ? null : n;
+        group.querySelectorAll('.score-btn').forEach(b=>b.classList.toggle('active', Number(b.dataset.score)===selfDraft.selfScoresLegacy[comp]));
+      });
+    });
+  });
+}
+
+// ③b nova mandala (Desempenho, escala 1-4) da autoanálise — editável pela gestora (grava em selfDraft.selfDesempenho)
+function renderSelfDesempenhoEditable(){
+  const body = document.getElementById('selfDesempenhoBody');
+  const el = document.getElementById('selfDesempenhoResult');
+  if(!activeSelf){ body.innerHTML = '<div class="empty-block-msg">Ainda sem autoanálise registrada para este ciclo.</div>'; el.innerHTML=''; return; }
+  body.innerHTML = DESEMPENHO.map(c=>{
+    const nome=c[0], desc=c[1];
+    return `<div class="comp-row"><div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
+      <div class="score-buttons" data-comp="${escapeAttr(nome)}">${[1,2,3,4].map(n=>`<button type="button" class="score-btn ${selfDraft.selfDesempenho[nome]===n?'active':''}" data-score="${n}" title="${escapeAttr(DESEMPENHO_LEVELS[n].label+' — '+DESEMPENHO_LEVELS[n].desc)}"><span class="num">${n}</span><span class="cap">${DESEMPENHO_LEVELS[n].label}</span></button>`).join('')}</div></div>`;
+  }).join('');
+  body.querySelectorAll('.score-buttons').forEach(group=>{
+    const comp = group.dataset.comp;
+    group.querySelectorAll('.score-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const n = Number(btn.dataset.score);
+        selfDraft.selfDesempenho[comp] = selfDraft.selfDesempenho[comp]===n ? null : n;
+        group.querySelectorAll('.score-btn').forEach(b=>b.classList.toggle('active', Number(b.dataset.score)===selfDraft.selfDesempenho[comp]));
+        renderSelfDesempenhoResult();
+      });
+    });
+  });
+  renderSelfDesempenhoResult();
+}
+function renderSelfDesempenhoResult(){
+  const el = document.getElementById('selfDesempenhoResult');
+  if(!activeSelf){ el.innerHTML=''; return; }
+  const stat = desempenhoStats(selfDraft.selfDesempenho);
+  if(!stat.answered){ el.innerHTML = '<div class="result-panel"><div class="result-empty">Assim que houver pelo menos uma competência marcada, o resultado aparece aqui.</div></div>'; return; }
+  el.innerHTML = `<div class="result-panel"><div class="result-title">Média da Mandala (Desempenho): ${stat.avg.toFixed(1)} / 4</div>
+    <div class="result-legend">${DESEMPENHO.map(c=>{ const v=selfDraft.selfDesempenho[c[0]]; return `<span><span class="legend-dot ${v?'l'+v:''}"></span>${c[2]}: ${v?DESEMPENHO_LEVELS[v].label:'—'}</span>`; }).join('')} <span>Respondidos: ${stat.answered}/${stat.total}</span></div></div>`;
 }
 
 // ④ editável pela gestora
@@ -1470,17 +1645,109 @@ function renderMonthBlock(field, bodyId, keys, wide4){
   });
 }
 
-// ⑦ referência
+// ⑦ preenchida pelo(a) colaborador(a) — agora editável/corrigível pela gestora (grava em selfDraft)
 function renderAspirationReference(){
   const body = document.getElementById('aspirationRefBody');
-  if(!activeSelf || (!activeSelf.aspiracao_objetivo && !activeSelf.aspiracao_prazo && !activeSelf.aspiracao_proximo_ciclo)){
-    body.innerHTML = '<div class="empty-block-msg">Ainda não preenchida pelo(a) colaborador(a).</div>'; return;
+  if(!activeSelf){
+    body.innerHTML = '<div class="empty-block-msg">Ainda sem autoanálise registrada para este ciclo.</div>';
+    return;
   }
-  body.innerHTML = `<div class="readonly-box">
-    <strong>Aonde quer chegar:</strong> ${escapeHtml(activeSelf.aspiracao_objetivo)||'—'}<br>
-    <strong>Prazo desejado:</strong> ${activeSelf.aspiracao_prazo||'—'}<br>
-    <strong>Próximo ciclo de desenvolvimento:</strong> ${activeSelf.aspiracao_proximo_ciclo||'—'}
-  </div>`;
+  body.innerHTML = `
+    <div class="aspiration-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div class="field" style="grid-column:1 / -1;"><label>Aonde quer chegar</label><textarea id="selfAspObjetivo" rows="2">${escapeHtml(selfDraft.selfAspiracaoObjetivo)}</textarea></div>
+      <div class="field half"><label>Prazo desejado</label><select id="selfAspPrazo"><option value="">Selecionar...</option>${ASPIRATION_TIMEFRAMES.map(t=>`<option value="${escapeAttr(t)}" ${selfDraft.selfAspiracaoPrazo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="field" style="grid-column:1 / -1;"><label>Próximo ciclo de desenvolvimento</label><select id="selfAspProximo"><option value="">Selecionar...</option>${NEXT_CYCLE_OPTIONS.map(t=>`<option value="${escapeAttr(t)}" ${selfDraft.selfAspiracaoProximoCiclo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    </div>`;
+  document.getElementById('selfAspObjetivo').addEventListener('input', e=>selfDraft.selfAspiracaoObjetivo=e.target.value);
+  document.getElementById('selfAspPrazo').addEventListener('change', e=>selfDraft.selfAspiracaoPrazo=e.target.value);
+  document.getElementById('selfAspProximo').addEventListener('change', e=>selfDraft.selfAspiracaoProximoCiclo=e.target.value);
+}
+
+/* ---- ⑤b/⑥b histórico mensal contínuo (acionamentos_mensal / consumo_mensal) ---- */
+function renderMensalTable(kind, bodyId){
+  const body = document.getElementById(bodyId);
+  const rows = mensalDraft[kind];
+  const cols = kind==='acionamentos'
+    ? [['ano','Ano','number'],['mes_index','Mês','month'],['quantidade','Qtd. acionamentos','number'],['meta','Meta','number'],['visitas','Qtd. visitas','number'],['meta_visitas','Meta visitas','number']]
+    : [['ano','Ano','number'],['mes_index','Mês','month'],['quantidade','Qtd./Análise geral','number'],['meta','Meta','number'],['observacoes','Observações','text']];
+  if(!rows.length){ body.innerHTML = '<div class="empty-block-msg">Nenhum mês lançado ainda. Use "+ adicionar mês" ou importe uma planilha real na aba "Importar dados".</div>'; return; }
+  const order = rows.map((r,i)=>i).sort((a,b)=> (rows[a].ano-rows[b].ano) || (rows[a].mes_index-rows[b].mes_index));
+  body.innerHTML = `<div class="entry">` + order.map(i=>{
+    const r = rows[i];
+    const cells = cols.map(([k,label,type])=>{
+      if(type==='month'){
+        return `<div class="field"><label>${label}</label><select data-mk="${kind}:${i}:${k}">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}" ${Number(r[k])===m?'selected':''}>${MES_LABEL_BY_INDEX[m]}</option>`).join('')}</select></div>`;
+      }
+      const val = r[k] ?? '';
+      const cls = k==='observacoes' ? 'grow' : '';
+      return `<div class="field ${cls}"><label>${label}</label><input type="${type}" ${type==='number'?'min="0"':''} data-mk="${kind}:${i}:${k}" value="${escapeAttr(val)}"></div>`;
+    }).join('');
+    return `<div class="mensal-row">${cells}<button class="btn-remove" data-mensal-remove="${kind}:${i}" type="button" title="Remover">✕</button></div>`;
+  }).join('') + `</div>`;
+  body.querySelectorAll('[data-mk]').forEach(inp=>{
+    const handler = e=>{
+      const [k, idx, field] = e.target.dataset.mk.split(':');
+      mensalDraft[k][idx][field] = e.target.value;
+    };
+    inp.addEventListener('input', handler);
+    inp.addEventListener('change', handler);
+  });
+  body.querySelectorAll('[data-mensal-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const [k, idx] = e.currentTarget.dataset.mensalRemove.split(':');
+      mensalDraft[k].splice(Number(idx),1);
+      renderMensalTable(k, k==='acionamentos'?'mensalAcionamentosBody':'mensalConsumoBody');
+    });
+  });
+}
+function renderMensalSections(){
+  renderMensalTable('acionamentos','mensalAcionamentosBody');
+  renderMensalTable('consumo','mensalConsumoBody');
+  document.getElementById('btnAddMesAcionamentos').addEventListener('click', ()=>{
+    const last = mensalDraft.acionamentos[mensalDraft.acionamentos.length-1];
+    mensalDraft.acionamentos.push({ano:last?last.ano:new Date().getFullYear(), mes_index:1, quantidade:'', meta:'', visitas:'', meta_visitas:''});
+    renderMensalTable('acionamentos','mensalAcionamentosBody');
+  });
+  document.getElementById('btnAddMesConsumo').addEventListener('click', ()=>{
+    const last = mensalDraft.consumo[mensalDraft.consumo.length-1];
+    mensalDraft.consumo.push({ano:last?last.ano:new Date().getFullYear(), mes_index:1, quantidade:'', meta:'', observacoes:''});
+    renderMensalTable('consumo','mensalConsumoBody');
+  });
+  document.getElementById('btnSalvarMensalAcionamentos').addEventListener('click', ()=>salvarMensal('acionamentos'));
+  document.getElementById('btnSalvarMensalConsumo').addEventListener('click', ()=>salvarMensal('consumo'));
+}
+async function salvarMensal(kind){
+  const btnId = kind==='acionamentos' ? 'btnSalvarMensalAcionamentos' : 'btnSalvarMensalConsumo';
+  const btn = document.getElementById(btnId);
+  const execId = activeExec.executive.id;
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try{
+    const rows = mensalDraft[kind].filter(r=>r.ano && r.mes_index).map(r=>{
+      const base = { executive_id: execId, ano:Number(r.ano), mes_index:Number(r.mes_index), mes_label: MES_LABEL_BY_INDEX[Number(r.mes_index)] };
+      base.quantidade = (r.quantidade!==''&&r.quantidade!==null&&r.quantidade!==undefined) ? Number(r.quantidade) : null;
+      base.meta = (r.meta!==''&&r.meta!==null&&r.meta!==undefined) ? Number(r.meta) : null;
+      if(kind==='acionamentos'){
+        base.visitas = (r.visitas!==''&&r.visitas!==null&&r.visitas!==undefined) ? Number(r.visitas) : null;
+        base.meta_visitas = (r.meta_visitas!==''&&r.meta_visitas!==null&&r.meta_visitas!==undefined) ? Number(r.meta_visitas) : null;
+      } else {
+        base.observacoes = r.observacoes || null;
+      }
+      return base;
+    });
+    if(rows.length){
+      const table = kind==='acionamentos' ? 'acionamentos_mensal' : 'consumo_mensal';
+      const { error } = await sb.from(table).upsert(rows, 'executive_id,ano,mes_index');
+      if(error) throw error;
+    }
+    await loadTeam(true);
+    showToast('Histórico mensal salvo com sucesso.');
+  } catch(err){
+    console.error(err);
+    alert('Não foi possível salvar o histórico mensal. ' + (err.message||''));
+  } finally {
+    const b = document.getElementById(btnId);
+    if(b){ b.disabled=false; b.textContent = kind==='acionamentos' ? 'Salvar histórico de acionamentos' : 'Salvar histórico de consumo'; }
+  }
 }
 
 // ⑧⑨ listas simples / ⑩ próximos passos
@@ -1585,6 +1852,18 @@ function renderMonthlyEvolutionChart(t){
       consumoData.push(c && c.quantidade!==null && c.quantidade!==undefined ? c.quantidade : null);
     }
   });
+  // histórico mensal contínuo (planilhas reais importadas / lançamentos diretos em ⑤b⑥b)
+  const mensalKeys = new Set();
+  (t.mensalAcionamentos||[]).forEach(m=>mensalKeys.add(m.ano+'-'+m.mes_index));
+  (t.mensalConsumo||[]).forEach(m=>mensalKeys.add(m.ano+'-'+m.mes_index));
+  [...mensalKeys].sort((a,b)=>{ const [ay,am]=a.split('-').map(Number); const [by,bm]=b.split('-').map(Number); return (ay-by)||(am-bm); }).forEach(k=>{
+    const [ano, mi] = k.split('-').map(Number);
+    const a = (t.mensalAcionamentos||[]).find(m=>m.ano===ano && m.mes_index===mi);
+    const c = (t.mensalConsumo||[]).find(m=>m.ano===ano && m.mes_index===mi);
+    labels.push((MES_LABEL_BY_INDEX[mi]||mi)+'/'+ano);
+    acionData.push(a && a.quantidade!==null && a.quantidade!==undefined ? a.quantidade : null);
+    consumoData.push(c && c.quantidade!==null && c.quantidade!==undefined ? c.quantidade : null);
+  });
   if(!labels.length){
     ctx.parentElement.innerHTML = '<p class="empty-block-msg">Sem dados de acionamentos ou consumo lançados ainda para esta pessoa (preencha nas seções ⑤ e ⑥, ou importe em lote em "Importar dados").</p>';
     return;
@@ -1667,10 +1946,45 @@ async function salvarAnalise(){
       nextRows.length ? sb.from('manager_next_steps').insert(nextRows) : Promise.resolve(),
     ]);
 
+    // ---- ①③⑦ + nova mandala: a gestora também pode corrigir a autoanálise ----
+    // (não sobrescreve nada da gestão acima — só ajusta os quadros que vieram do(a) próprio(a) colaborador(a))
+    const saId = selfDraft.saId;
+    if(saId){
+      const selfPontosRows = CRITERIA.filter(c=>selfDraft.selfPicks[c[0]]).map(c=>({self_assessment_id:saId, ponto:c[0], quadrante:selfDraft.selfPicks[c[0]]}));
+      const selfCompRows = COMPETENCIAS.filter(c=>selfDraft.selfScoresLegacy[c[0]]).map(c=>({self_assessment_id:saId, competencia:c[0], nota:selfDraft.selfScoresLegacy[c[0]]}));
+      const selfDesempRows = DESEMPENHO.filter(c=>selfDraft.selfDesempenho[c[0]]).map(c=>({self_assessment_id:saId, comportamento:c[0], nota:selfDraft.selfDesempenho[c[0]]}));
+
+      const picksProf = picksProfile(selfDraft.selfPicks);
+      const legacyStat = scoreStats(selfDraft.selfScoresLegacy);
+      const desempStat = desempenhoStats(selfDraft.selfDesempenho);
+
+      const selfPayload = {
+        aspiracao_objetivo: selfDraft.selfAspiracaoObjetivo || null,
+        aspiracao_prazo: selfDraft.selfAspiracaoPrazo || null,
+        aspiracao_proximo_ciclo: selfDraft.selfAspiracaoProximoCiclo || null
+      };
+      if(picksProf.answered) selfPayload.quadrante_geral = picksProf.predominant;
+      if(legacyStat.answered) selfPayload.media_competencias = Math.round(legacyStat.avg*10)/10;
+      if(desempStat.answered) selfPayload.media_desempenho = Math.round(desempStat.avg*10)/10;
+
+      await sb.from('self_assessments').update(selfPayload).eq('id', saId);
+      await Promise.all([
+        sb.from('self_assessment_pontos').delete().eq('self_assessment_id', saId),
+        sb.from('self_assessment_competencias').delete().eq('self_assessment_id', saId),
+        sb.from('self_assessment_desempenho').delete().eq('self_assessment_id', saId),
+      ]);
+      await Promise.all([
+        selfPontosRows.length ? sb.from('self_assessment_pontos').insert(selfPontosRows) : Promise.resolve(),
+        selfCompRows.length ? sb.from('self_assessment_competencias').insert(selfCompRows) : Promise.resolve(),
+        selfDesempRows.length ? sb.from('self_assessment_desempenho').insert(selfDesempRows) : Promise.resolve(),
+      ]);
+    }
+
     await loadTeam();
     activeExec = teamData.find(t=>t.executive.id===activeExec.executive.id);
     activeSelf = activeExec.assessments.find(a=>a.id===activeSelf.id) || latestSelf(activeExec);
     draft = draftFromManager(managerForSelf(activeExec, activeSelf.id));
+    selfDraft = selfDraftFromAssessment(activeSelf);
     renderPersonForm();
     document.getElementById('saveMsg').style.display='block';
   } catch(err){
@@ -1796,10 +2110,21 @@ function renderImportador(){
   main.innerHTML = `
     <div class="quadrant-wrap">
       <h2>Importar dados em lote</h2>
-      <p>Suba uma planilha (Excel .xlsx/.xls ou .csv) para lançar de uma vez o <strong>Registro de acionamentos</strong> ou o <strong>Consumo estratégico</strong> de vários executivos, em vez de preencher pessoa por pessoa. Se já existir um registro para o mesmo executivo e ciclo, os 3 meses são substituídos pelos da planilha.</p>
+      <p>Suba uma planilha para lançar de uma vez os dados de vários executivos, em vez de preencher pessoa por pessoa. Nenhuma importação apaga registros de ciclos anteriores — os dados entram como histórico mensal contínuo (seções ⑤b/⑥b de cada pessoa), somando-se ao que já existe.</p>
 
       <section class="gcard">
-        <h2>① Registro de acionamentos</h2>
+        <h2>① Importar planilha real — identificação automática de formato</h2>
+        <div class="sub">Suba diretamente o arquivo exportado, sem precisar reformatar nada — por exemplo o "Acompanhamento de Acionamentos e Visitas" ou o "PLR / Consumo Estratégico". O painel identifica sozinho o tipo de planilha pelas abas/colunas: <span class="mono">Base Acionamentos</span> e/ou <span class="mono">Base Visitas</span> (acionamentos e visitas semanais/mensais) ou <span class="mono">Base</span> com a coluna <span class="mono">Prioridade 1</span> (export de consumo estratégico do Power BI). Como essas planilhas não trazem o ano, informe-o abaixo.</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin:10px 0;">
+          <div class="field" style="max-width:110px;"><label>Ano de referência</label><input type="number" id="anoImportReal" value="${new Date().getFullYear()}" min="2020" max="2100"></div>
+          <input type="file" id="fileReal" accept=".xlsx,.xls,.csv">
+          <button class="btn btn-primary btn-sm" id="btnImportarReal" type="button">Processar importação</button>
+        </div>
+        <div id="msgReal"></div>
+      </section>
+
+      <section class="gcard">
+        <h2>② Registro de acionamentos (modelo simplificado, por ciclo)</h2>
         <div class="sub">Colunas esperadas: <span class="mono">Executivo, Ciclo, Mes1, Qtd1, Visitas1, Obs1, Mes2, Qtd2, Visitas2, Obs2, Mes3, Qtd3, Visitas3, Obs3</span>. "Ciclo" é opcional — se vazio, usa o ciclo da última autoanálise da pessoa (ou o ciclo atual).</div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0;">
           <button class="btn btn-ghost btn-sm" id="btnModeloAcionamentos" type="button">Baixar modelo (.csv)</button>
@@ -1810,7 +2135,7 @@ function renderImportador(){
       </section>
 
       <section class="gcard">
-        <h2>② Consumo estratégico</h2>
+        <h2>③ Consumo estratégico (modelo simplificado, por ciclo)</h2>
         <div class="sub">Colunas esperadas: <span class="mono">Executivo, Ciclo, Mes1, Qtd1, Obs1, Mes2, Qtd2, Obs2, Mes3, Qtd3, Obs3</span>. "Ciclo" é opcional, mesma regra acima.</div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0;">
           <button class="btn btn-ghost btn-sm" id="btnModeloConsumo" type="button">Baixar modelo (.csv)</button>
@@ -1836,6 +2161,7 @@ function renderImportador(){
 
   document.getElementById('btnImportarAcionamentos').addEventListener('click', ()=>processImportFile('fileAcionamentos','msgAcionamentos','acionamentos'));
   document.getElementById('btnImportarConsumo').addEventListener('click', ()=>processImportFile('fileConsumo','msgConsumo','consumo'));
+  document.getElementById('btnImportarReal').addEventListener('click', ()=>processRealDataFile('fileReal','anoImportReal','msgReal'));
 }
 
 function readSheetRows(file){
@@ -1905,6 +2231,143 @@ async function processImportFile(inputId, msgId, tipo){
   const resultEl = document.getElementById(msgId);
   resultEl.innerHTML = `<div class="ok-msg" style="display:block;">${ok} registro(s) importado(s) com sucesso.</div>` +
     (errors.length ? `<div class="error-msg" style="display:block;">${errors.length} com problema:<br>${errors.map(e=>escapeHtml(e)).join('<br>')}</div>` : '');
+}
+
+/* ------------------------------------------------------------------------
+   Importador da planilha REAL (identificação automática de formato)
+   Reconhece:
+   - Acionamentos/visitas: abas "Base Acionamentos" (semanal, soma por mês)
+     e/ou "Base Visitas" (já mensal) do arquivo de Acompanhamento.
+   - Consumo estratégico: aba "Base" com a coluna "Prioridade 1" (export
+     do Power BI usado na planilha de PLR / Consumo Estratégico).
+   Os dados entram em acionamentos_mensal / consumo_mensal (upsert por
+   executivo+ano+mês) — não mexe em manager_acionamentos/manager_consumo
+   nem em nenhum outro registro já existente.
+   ------------------------------------------------------------------------ */
+function readWorkbookAllSheets(file){
+  return new Promise((resolve, reject)=>{
+    if(typeof XLSX === 'undefined'){ reject(new Error('Biblioteca de leitura de planilhas não carregou (verifique a conexão) — tente novamente.')); return; }
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{ resolve(XLSX.read(new Uint8Array(e.target.result), { type:'array' })); }
+      catch(err){ reject(err); }
+    };
+    reader.onerror = ()=>reject(new Error('Não foi possível ler o arquivo.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+function sheetToRows(wb, name){
+  const sheet = wb.Sheets[name];
+  if(!sheet) return null;
+  return XLSX.utils.sheet_to_json(sheet, { defval:'' });
+}
+
+async function processRealDataFile(inputId, anoId, msgId){
+  const input = document.getElementById(inputId);
+  const msgEl = document.getElementById(msgId);
+  const ano = Number(document.getElementById(anoId).value) || new Date().getFullYear();
+  const file = input.files && input.files[0];
+  if(!file){ msgEl.innerHTML = '<div class="error-msg" style="display:block;">Selecione um arquivo primeiro.</div>'; return; }
+  msgEl.innerHTML = '<div class="sub">Lendo e identificando o formato do arquivo...</div>';
+
+  try{
+    const wb = await readWorkbookAllSheets(file);
+    const sheetNames = wb.SheetNames || [];
+    const hasAcion = sheetNames.includes('Base Acionamentos');
+    const hasVisitas = sheetNames.includes('Base Visitas');
+    const baseRows = sheetToRows(wb, 'Base');
+    const hasConsumo = !!(baseRows && baseRows.length && Object.prototype.hasOwnProperty.call(baseRows[0], 'Prioridade 1'));
+
+    if(!hasAcion && !hasVisitas && !hasConsumo){
+      msgEl.innerHTML = '<div class="error-msg" style="display:block;">Não foi possível identificar o formato desta planilha. O painel reconhece automaticamente: planilha de <strong>Acionamentos/Visitas</strong> (abas "Base Acionamentos" e/ou "Base Visitas") ou planilha de <strong>Consumo estratégico</strong> (aba "Base" com a coluna "Prioridade 1", export do Power BI).</div>';
+      return;
+    }
+
+    const notFound = new Set();
+    const monthsTouched = new Set();
+    let acionSalvos = 0, consumoSalvos = 0;
+
+    if(hasAcion || hasVisitas){
+      const agg = {}; // chave "nome|mesIndex" -> {nome, mi, quantidade, meta, temAcion, visitas, metaVisitas}
+      if(hasAcion){
+        (sheetToRows(wb,'Base Acionamentos')||[]).forEach(r=>{
+          const nome = String(r['Executivo']||'').trim();
+          const mi = mesIndexFromLabel(r['Mês']);
+          if(!nome || !mi) return;
+          const key = nome+'|'+mi;
+          if(!agg[key]) agg[key] = { nome, mi, quantidade:0, meta:0, temAcion:false };
+          agg[key].quantidade += Number(r['Quantidade'])||0;
+          agg[key].meta += Number(r['Meta'])||0;
+          agg[key].temAcion = true;
+        });
+      }
+      if(hasVisitas){
+        (sheetToRows(wb,'Base Visitas')||[]).forEach(r=>{
+          const nome = String(r['Executivo']||'').trim();
+          const mi = mesIndexFromLabel(r['Mês']);
+          if(!nome || !mi) return;
+          const key = nome+'|'+mi;
+          if(!agg[key]) agg[key] = { nome, mi, quantidade:0, meta:0, temAcion:false };
+          agg[key].visitas = Number(r['Qtd Visitas'])||0;
+          agg[key].metaVisitas = Number(r['Meta Visitas'])||0;
+        });
+      }
+      const rows = [];
+      Object.values(agg).forEach(a=>{
+        const t = findExecutiveByName(a.nome);
+        if(!t){ notFound.add(a.nome); return; }
+        monthsTouched.add(MES_LABEL_BY_INDEX[a.mi]+'/'+ano);
+        rows.push({
+          executive_id: t.executive.id, ano, mes_index: a.mi, mes_label: MES_LABEL_BY_INDEX[a.mi],
+          quantidade: a.temAcion ? a.quantidade : null,
+          meta: a.temAcion ? a.meta : null,
+          visitas: a.visitas!==undefined ? a.visitas : null,
+          meta_visitas: a.metaVisitas!==undefined ? a.metaVisitas : null
+        });
+      });
+      if(rows.length){
+        const { error } = await sb.from('acionamentos_mensal').upsert(rows, 'executive_id,ano,mes_index');
+        if(error){ msgEl.innerHTML = `<div class="error-msg" style="display:block;">Erro ao salvar acionamentos/visitas: ${escapeHtml(error.message)}</div>`; return; }
+        acionSalvos = rows.length;
+      }
+    }
+
+    if(hasConsumo){
+      const rows = [];
+      (baseRows||[]).forEach(r=>{
+        const nome = String(r['Executivo']||'').trim();
+        const mi = mesIndexFromLabel(r['Mês']);
+        if(!nome || !mi) return;
+        const t = findExecutiveByName(nome);
+        if(!t){ notFound.add(nome); return; }
+        monthsTouched.add(MES_LABEL_BY_INDEX[mi]+'/'+ano);
+        const obs = `Prioridade 1: ${r['Prioridade 1']!==''?r['Prioridade 1']:'—'} · Prioridade 2: ${r['Prioridade 2']!==''?r['Prioridade 2']:'—'} · Produtividade: ${r['Produtividade %']!==''?r['Produtividade %']:'—'} · Status: ${r['Status']!==''?r['Status']:'—'}`;
+        rows.push({
+          executive_id: t.executive.id, ano, mes_index: mi, mes_label: MES_LABEL_BY_INDEX[mi],
+          quantidade: r['Análise Geral']!==undefined && r['Análise Geral']!=='' ? Number(r['Análise Geral']) : null,
+          meta: r['Meta Prioridade']!==undefined && r['Meta Prioridade']!=='' ? Number(r['Meta Prioridade']) : null,
+          observacoes: obs
+        });
+      });
+      if(rows.length){
+        const { error } = await sb.from('consumo_mensal').upsert(rows, 'executive_id,ano,mes_index');
+        if(error){ msgEl.innerHTML = `<div class="error-msg" style="display:block;">Erro ao salvar consumo estratégico: ${escapeHtml(error.message)}</div>`; return; }
+        consumoSalvos = rows.length;
+      }
+    }
+
+    await loadTeam(false);
+    currentView='importar'; setActiveTab(); renderImportador();
+    const resultEl = document.getElementById(msgId);
+    const parts = [];
+    if(hasAcion||hasVisitas) parts.push('Planilha identificada como <strong>Acionamentos/Visitas</strong> — ' + acionSalvos + ' registro(s) mensal(is) salvos.');
+    if(hasConsumo) parts.push('Planilha identificada como <strong>Consumo estratégico</strong> — ' + consumoSalvos + ' registro(s) mensal(is) salvos.');
+    resultEl.innerHTML = `<div class="ok-msg" style="display:block;">${parts.join('<br>')}<br>Meses processados: ${[...monthsTouched].join(', ')||'—'}</div>` +
+      (notFound.size ? `<div class="error-msg" style="display:block;">${notFound.size} nome(s) da planilha não encontrados no cadastro (confira grafia/apelido e reimporte se necessário): ${[...notFound].map(escapeHtml).join(', ')}</div>` : '');
+  } catch(err){
+    console.error(err);
+    msgEl.innerHTML = `<div class="error-msg" style="display:block;">${escapeHtml(err.message||String(err))}</div>`;
+  }
 }
 
 /* ======================================================================
