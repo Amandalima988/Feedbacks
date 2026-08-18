@@ -3,376 +3,404 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel de Autoanálise e Projeção de Carreira</title>
+<title>Feedbacks do Time — Autoanálise e Progressão de Carreira</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --surface:#fcfcfb; --page:#f4f3f0; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
-    --line:#e1e0d9; --border:rgba(11,11,11,.10);
-    --blue:#2a78d6; --orange:#eb6834;
-    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0; background:var(--page); color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    line-height:1.5;
-  }
-  .wrap{max-width:1080px; margin:0 auto; padding:28px 20px 80px;}
-  .wrap-narrow{max-width:840px;}
-  h1{font-family:Georgia,"Times New Roman",serif; font-weight:700; font-size:26px; margin:0; letter-spacing:-.01em;}
-  h2{font-family:Georgia,"Times New Roman",serif; font-size:18px; margin:0 0 4px;}
-  .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; flex-wrap:wrap; gap:12px;}
-  .topbar .sub{color:var(--ink-2); font-size:13px; margin-top:4px;}
-  .link-btn{font-size:13px; color:var(--ink-2); text-decoration:none; border:1px solid var(--border); padding:7px 14px; border-radius:8px; background:#fff; cursor:pointer; white-space:nowrap;}
-  .link-btn:hover{background:#f0f0ee;}
+:root{
+  --paper:#FAF7F1; --card:#FFFFFF; --ink:#20302B; --ink-soft:#5B6B64;
+  --pine:#24413B; --pine-dark:#182D28; --line:#E4DCC9;
+  --sage:#6E9A80; --sage-bg:#EDF3EC;
+  --amber:#C98A3A; --amber-bg:#FBF1E1;
+  --slate:#4F708A; --slate-bg:#EBF1F5;
+  --lilac:#6F5E8C; --lilac-bg:#EFEAF4;
+  --rose:#A24E68; --rose-bg:#F6E8ED;
+  --teal:#2E8B84; --teal-bg:#E4F2F0;
+  --clay:#9C6B3F; --clay-bg:#F3E9DD;
+  --danger:#B5573F;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{ background:var(--paper); color:var(--ink); font-family:'Inter',system-ui,sans-serif; font-size:14.5px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+h1,h2,h3,.display{ font-family:'Fraunces',serif; }
+.mono{ font-family:'IBM Plex Mono',monospace; letter-spacing:.02em; }
+a{ color:inherit; }
 
-  .card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px; margin-bottom:20px; box-shadow:0 1px 2px rgba(11,11,11,.04);}
-  .card .desc{color:var(--ink-2); font-size:13px; margin-bottom:18px;}
-  label{display:block; font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:6px;}
-  input[type=text], input[type=email], input[type=password], select, textarea{
-    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:14px; font-family:inherit; background:#fff; color:var(--ink);
-  }
-  input:focus, select:focus, textarea:focus{outline:2px solid var(--blue); outline-offset:1px;}
-  textarea{min-height:80px; resize:vertical;}
-  .row{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;}
-  @media (max-width:560px){ .row{grid-template-columns:1fr;} }
+select, input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], textarea{
+  font-family:'Inter',sans-serif; font-size:14px; color:var(--ink);
+  border:1px solid var(--line); background:#fff; border-radius:8px; padding:9px 11px; width:100%;
+}
+textarea{ resize:vertical; min-height:56px; }
+select{ width:auto; }
+input:focus, textarea:focus, select:focus{ outline:2px solid var(--slate); outline-offset:1px; }
+label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); display:block; margin-bottom:5px; }
 
-  .btn-primary{background:var(--ink); color:#fff; border:none; padding:13px 26px; border-radius:11px; font-size:15px; font-weight:600; cursor:pointer;}
-  .btn-primary:disabled{opacity:.45; cursor:not-allowed;}
-  .btn-secondary{background:#fff; color:var(--ink); border:1px solid var(--line); padding:11px 20px; border-radius:11px; font-size:14px; font-weight:600; cursor:pointer;}
-  .error-msg{color:#b3261e; font-size:13px; margin-top:10px; display:none;}
-  .ok-msg{color:var(--good); font-size:13px; margin-top:10px; display:none;}
+.btn{ font-family:'Inter',sans-serif; font-weight:600; font-size:13px; border-radius:8px; padding:9px 14px; border:1px solid transparent; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+.btn-primary{ background:var(--pine); color:#fff; }
+.btn-primary:hover{ background:var(--pine-dark); }
+.btn-primary:disabled{ opacity:.6; cursor:default; }
+.btn-ghost{ background:transparent; color:var(--pine); border-color:var(--line); }
+.btn-ghost:hover{ background:#fff; }
+.btn-add{ background:transparent; color:inherit; border:1px dashed currentColor; font-weight:600; padding:8px 12px; }
+.btn-remove{ background:transparent; border:none; color:var(--danger); cursor:pointer; font-size:18px; line-height:1; padding:2px 6px; }
+.btn-remove:hover{ opacity:.7; }
+.error-msg{ color:var(--danger); font-size:12.5px; margin-top:10px; display:none; }
+.ok-msg{ color:var(--sage); font-weight:600; font-size:13px; margin-top:10px; display:none; }
 
-  table{width:100%; border-collapse:collapse; font-size:13.5px;}
-  th, td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle;}
-  th{color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;}
+/* ---------- HOME ---------- */
+#screenHome{ display:flex; align-items:center; justify-content:center; min-height:100vh; }
+#screenHome .box{ max-width:460px; padding:20px; text-align:center; }
+#screenHome h1{ font-size:27px; margin-bottom:8px; }
+#screenHome p{ color:var(--ink-soft); font-size:14px; margin-bottom:28px; }
+#screenHome .links{ display:flex; flex-direction:column; gap:12px; }
+#screenHome a{ display:block; padding:17px; border-radius:12px; text-decoration:none; font-weight:600; border:1px solid var(--line); background:var(--card); color:var(--ink); transition:box-shadow .15s; cursor:pointer; }
+#screenHome a:hover{ box-shadow:0 8px 22px rgba(24,45,40,.08); }
+#screenHome a small{ display:block; font-weight:400; color:var(--ink-soft); margin-top:3px; }
 
-  /* ---------- HOME ---------- */
-  #screenHome{display:flex; align-items:center; justify-content:center; min-height:80vh;}
-  #screenHome .box{max-width:460px; padding:20px; text-align:center;}
-  #screenHome h1{font-size:26px; margin-bottom:8px;}
-  #screenHome p{color:var(--ink-2); font-size:14px; margin-bottom:28px;}
-  #screenHome .links{display:flex; flex-direction:column; gap:12px;}
-  #screenHome a{display:block; padding:16px; border-radius:12px; text-decoration:none; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--ink); transition:box-shadow .12s ease; cursor:pointer;}
-  #screenHome a:hover{box-shadow:0 4px 14px rgba(11,11,11,.08);}
-  #screenHome a small{display:block; font-weight:400; color:var(--muted); margin-top:3px;}
+/* ---------- LOGIN GATE (gestora) ---------- */
+.login-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.login-card{ width:100%; max-width:360px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:30px 26px; box-shadow:0 12px 32px rgba(24,45,40,.10); }
+.login-eyebrow{ font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-soft); }
+.login-card h1{ font-size:22px; margin:6px 0 4px; }
+.login-sub{ color:var(--ink-soft); font-size:13px; margin:0 0 20px; }
+.login-field{ margin-bottom:14px; }
 
-  /* ---------- AUTOANÁLISE (TIME) ---------- */
-  .ponto-item{padding:14px 0; border-bottom:1px solid var(--line);}
-  .ponto-item:last-child{border-bottom:none;}
-  .ponto-item .titulo{font-size:14px; font-weight:600; margin-bottom:10px;}
-  .quad-choices{display:flex; gap:8px; flex-wrap:wrap;}
-  .quad-btn{flex:1; min-width:110px; padding:9px 10px; text-align:center; border-radius:9px; border:1px solid var(--line); background:#fff; color:var(--ink-2); font-size:13px; cursor:pointer; transition:all .12s ease; user-select:none;}
-  .quad-btn:hover{border-color:var(--blue);}
-  .quad-btn.active{background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600;}
+/* ---------- SIDEBAR (gestora) ---------- */
+.app-shell{ display:none; min-height:100vh; }
+.app-shell.unlocked{ display:flex; }
+.sidebar{ width:290px; min-width:290px; background:var(--pine); color:#EFEBDD; display:flex; flex-direction:column; max-height:100vh; position:sticky; top:0; }
+.sidebar-head{ padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,.12); }
+.sidebar-head .eyebrow{ font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:#B9CFC3; }
+.sidebar-head h1{ font-size:20px; font-weight:600; margin:6px 0 12px; color:#fff; }
+.progress-track{ height:6px; border-radius:4px; background:rgba(255,255,255,.15); overflow:hidden; }
+.progress-fill{ height:100%; background:linear-gradient(90deg,#8FBBA0,#EFEBDD); width:0%; transition:width .4s ease; }
+.progress-label{ font-size:11.5px; color:#C7D9CE; margin-top:6px; display:flex; justify-content:space-between; }
+.nav-tabs{ display:flex; flex-wrap:wrap; gap:6px; margin-top:16px; }
+.nav-tab{ flex:1 1 auto; min-width:84px; font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:7px 6px; border-radius:7px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#C7D9CE; cursor:pointer; }
+.nav-tab.active{ background:#EFEBDD; color:var(--pine-dark); border-color:#EFEBDD; }
+.nav-tab:hover:not(.active){ background:rgba(255,255,255,.08); }
+.sidebar-search{ padding:10px 14px 0; }
+.sidebar-search input{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#fff; }
+.sidebar-search input::placeholder{ color:#9DB8AC; }
+.timeline{ flex:1; overflow-y:auto; padding:8px 10px 24px; }
+.week-label{ font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:#9DB8AC; padding:10px 10px 6px; }
+.item{ display:flex; align-items:flex-start; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; border:1px solid transparent; }
+.item:hover{ background:rgba(255,255,255,.07); }
+.item.active{ background:#EFEBDD; color:var(--pine-dark); }
+.dot{ width:10px; height:10px; border-radius:50%; margin-top:5px; flex:none; border:2px solid #9DB8AC; background:transparent; }
+.dot.done{ background:#8FBBA0; border-color:#8FBBA0; }
+.item.active .dot{ border-color:var(--pine); }
+.item.active .dot.done{ background:var(--sage); border-color:var(--sage); }
+.item-name{ font-size:13.5px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.item-sub{ font-size:11px; color:#B9CFC3; }
+.item.active .item-sub{ color:var(--pine-dark); opacity:.65; }
+.sidebar-foot{ padding:10px 14px 16px; border-top:1px solid rgba(255,255,255,.12); }
+.sidebar-foot .link-btn{ color:#EFEBDD; border-color:rgba(255,255,255,.25); background:transparent; }
 
-  .comp-item{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line);}
-  .comp-item:last-child{border-bottom:none;}
-  .comp-item .titulo{font-size:14px; font-weight:600;}
-  .nota-choices{display:flex; gap:6px;}
-  .nota-btn{width:38px; height:38px; border-radius:9px; border:1px solid var(--line); background:#fff; color:var(--ink-2); font-weight:700; cursor:pointer; transition:all .12s ease;}
-  .nota-btn:hover{border-color:var(--blue);}
-  .nota-btn.active{background:var(--blue); border-color:var(--blue); color:#fff;}
+/* ---------- MAIN ---------- */
+.main{ flex:1; min-width:0; padding:34px 42px 80px; max-width:960px; }
+.empty-state{ margin-top:80px; max-width:520px; }
+.empty-state h2{ font-size:26px; margin:0 0 10px; }
+.empty-state p{ color:var(--ink-soft); }
+.form-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:22px; flex-wrap:wrap; }
+.form-head h2{ font-size:27px; margin:0 0 4px; }
+.form-head .meta{ color:var(--ink-soft); font-size:13px; }
+.head-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.concluded-toggle{ display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:500; user-select:none; }
+.concluded-toggle input{ width:16px; height:16px; accent-color:var(--sage); }
+.save-status{ font-size:12px; color:var(--ink-soft); min-width:70px; }
 
-  #resultado{display:none;}
-  .result-header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:20px; flex-wrap:wrap; gap:10px;}
-  .result-header h2{font-size:24px; margin:0;}
-  .result-header .cargo{color:var(--ink-2); font-size:14px; margin-top:2px;}
-  .result-header .meta{text-align:right; font-size:13px; color:var(--ink-2);}
-  .quad-label{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px;}
-  .quad-value{font-family:Georgia,serif; font-size:22px; font-weight:700;}
-  .radar-wrap{max-width:420px; margin:8px auto 20px;}
-  .media-line{font-size:14px; margin-top:12px; color:var(--ink-2);}
-  .media-line b{color:var(--ink);}
-  #stepSelector{display:flex; align-items:flex-end; gap:12px;}
-  #stepSelector > div{flex:1;}
-  @media (max-width:560px){ #stepSelector{flex-direction:column; align-items:stretch;} }
+section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--line); background:var(--card); overflow:hidden; }
+.block-head{ padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+.block-head h3{ margin:0; font-size:16px; font-weight:600; }
+.block-sub{ padding:0 18px 4px; font-size:12.5px; color:var(--ink-soft); margin-top:-4px; }
+.block-body{ padding:14px 18px 18px; display:flex; flex-direction:column; gap:14px; }
+.block.self .block-head{ background:var(--lilac-bg); color:#3C3253; }
+.block.manager .block-head{ background:var(--rose-bg); color:#5C2A3B; }
+.block.critself .block-head{ background:var(--slate-bg); color:#1F3B44; }
+.block.critmanager .block-head{ background:var(--rose-bg); color:#5C2A3B; }
+.block.acionamentos .block-head{ background:var(--clay-bg); color:#4A3520; }
+.block.consumo .block-head{ background:var(--teal-bg); color:#1D4F4A; }
+.block.aspiration .block-head{ background:var(--teal-bg); color:#1D4F4A; }
+.block.positives .block-head{ background:var(--sage-bg); color:#33513F; }
+.block.develop .block-head{ background:var(--amber-bg); color:#5C3E13; }
+.block.next .block-head{ background:var(--slate-bg); color:#2C4256; }
 
-  /* ---------- GESTORA ---------- */
-  #loginScreenBox{max-width:380px; margin:60px auto 0;}
-  #searchBox{margin-bottom:16px;}
-  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px;}
-  .exec-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; cursor:pointer; transition:box-shadow .12s ease, transform .12s ease;}
-  .exec-card:hover{box-shadow:0 4px 14px rgba(11,11,11,.08); transform:translateY(-1px);}
-  .exec-card .nome{font-family:Georgia,serif; font-size:16px; font-weight:700;}
-  .exec-card .cargo{font-size:12.5px; color:var(--ink-2); margin-top:1px;}
-  .exec-card .meta-row{display:flex; justify-content:space-between; align-items:center; margin-top:12px;}
-  .badge{display:inline-block; padding:3px 9px; border-radius:99px; font-size:11px; font-weight:700; letter-spacing:.02em;}
-  .badge-quad{background:var(--blue); color:#fff;}
-  .badge-status-good{background:rgba(12,163,12,.12); color:#0a7a0a;}
-  .badge-status-warning{background:rgba(250,178,25,.18); color:#8a5b00;}
-  .badge-status-pending{background:#eee; color:var(--ink-2);}
-  .exec-card .media{font-size:12px; color:var(--muted);}
-  .empty-state{color:var(--muted); font-size:14px; padding:30px 0; text-align:center;}
+/* pick-cards (pontos comportamentais) */
+.self-row{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:#FEFDFB; }
+.self-crit-name{ font-weight:600; font-size:13.5px; margin-bottom:10px; display:block; }
+.pick-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.pick-card{ border:1.5px solid var(--line); border-radius:10px; padding:10px 11px; cursor:pointer; background:#fff; transition:border-color .15s, background .15s; }
+.pick-card:hover{ border-color:#B9B2A0; }
+.pick-card .pick-level{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; margin-bottom:5px; display:block; }
+.pick-card .pick-desc{ font-size:12.5px; color:var(--ink-soft); line-height:1.45; }
+.pick-card[data-level="1"] .pick-level{ color:#4C7A5F; }
+.pick-card[data-level="2"] .pick-level{ color:#A66C1F; }
+.pick-card[data-level="3"] .pick-level{ color:#3A5A73; }
+.pick-card[data-level="1"].active{ background:var(--sage-bg); border-color:var(--sage); }
+.pick-card[data-level="2"].active{ background:var(--amber-bg); border-color:var(--amber); }
+.pick-card[data-level="3"].active{ background:var(--slate-bg); border-color:var(--slate); }
+.pick-card.active .pick-desc{ color:var(--ink); }
+.pick-card.readonly{ cursor:default; }
+.result-panel{ padding:14px 16px; border-radius:10px; background:#F6F3EC; border:1px solid var(--line); }
+.result-title{ font-family:'Fraunces',serif; font-size:15px; font-weight:600; margin-bottom:8px; }
+.result-bar-track{ display:flex; height:12px; border-radius:999px; overflow:hidden; background:#E9E3D2; margin-bottom:8px; }
+.result-bar-seg.l1{ background:var(--sage); } .result-bar-seg.l2{ background:var(--amber); } .result-bar-seg.l3{ background:var(--slate); }
+.result-legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-soft); }
+.result-legend span{ display:inline-flex; align-items:center; gap:6px; }
+.legend-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+.legend-dot.l1{ background:var(--sage); } .legend-dot.l2{ background:var(--amber); } .legend-dot.l3{ background:var(--slate); }
+.result-empty{ font-size:12.5px; color:var(--ink-soft); font-style:italic; }
 
-  #detailPanel{display:none;}
-  .detail-header{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px; margin-bottom:20px;}
-  .detail-header h2{font-size:24px;}
-  .detail-header .cargo{color:var(--ink-2); font-size:14px;}
-  .detail-actions{display:flex; gap:10px; flex-wrap:wrap;}
-  select#cycleSelect{width:auto; min-width:160px;}
-  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
-  @media (max-width:800px){ .two-col{grid-template-columns:1fr;} }
-  td select{padding:6px 8px; font-size:13px;}
-  .legend-row{display:flex; gap:16px; font-size:12.5px; color:var(--ink-2); margin:6px 0 14px;}
-  .legend-dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px;}
-  .chart-box{max-width:100%; margin:6px 0 10px;}
-  .section-title{font-family:Georgia,serif; font-size:16px; margin:26px 0 10px; padding-top:16px; border-top:1px solid var(--line);}
-  .row-2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
-  @media (max-width:600px){ .row-2{grid-template-columns:1fr;} }
-  .quad-history{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
-  .quad-chip{font-size:11.5px; background:#f0f0ee; border-radius:8px; padding:4px 9px; color:var(--ink-2);}
-  .readonly-box{background:#f7f7f5; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:13.5px; color:var(--ink-2); white-space:pre-wrap;}
-  .save-msg{font-size:13px; color:var(--good); margin-top:10px; display:none;}
+/* competency score rows */
+.comp-row{ display:flex; justify-content:space-between; align-items:center; gap:16px; padding:11px 0; border-bottom:1px solid var(--line); }
+.comp-row:last-child{ border-bottom:none; }
+.comp-info{ flex:1; min-width:0; }
+.comp-name{ font-weight:600; font-size:13.5px; display:block; }
+.comp-desc{ font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
+.score-buttons{ display:flex; gap:6px; flex:none; }
+.score-btn{ width:74px; padding:7px 4px 6px; border-radius:8px; border:1.5px solid var(--line); background:#fff; cursor:pointer; text-align:center; color:var(--ink-soft); }
+.score-btn .num{ font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:15px; display:block; }
+.score-btn .cap{ display:block; font-size:8.3px; font-weight:500; margin-top:2px; line-height:1.15; }
+.score-btn[data-score="1"].active{ background:var(--amber-bg); border-color:var(--amber); color:#5C3E13; }
+.score-btn[data-score="2"].active{ background:var(--slate-bg); border-color:var(--slate); color:#2C4256; }
+.score-btn[data-score="3"].active{ background:var(--sage-bg); border-color:var(--sage); color:#33513F; }
+.score-btn.readonly{ cursor:default; }
+
+/* mandala radar */
+.mandala-sub-title{ font-family:'Fraunces',serif; font-size:15px; font-weight:600; margin:2px 0 10px; color:var(--pine-dark); }
+.radar-wrap{ display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+.radar-legend{ display:flex; gap:16px; font-size:11.5px; color:var(--ink-soft); margin-top:6px; justify-content:center; }
+.radar-legend span{ display:inline-flex; align-items:center; gap:6px; }
+.legend-swatch{ width:14px; height:3px; border-radius:2px; display:inline-block; }
+.stats-col{ flex:1; min-width:260px; }
+.stat-line{ display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0; border-bottom:1px dashed var(--line); }
+.stat-line:last-child{ border-bottom:none; }
+.stat-badge{ font-family:'IBM Plex Mono',monospace; font-weight:700; padding:2px 10px; border-radius:999px; color:#fff; font-size:10.5px; white-space:nowrap; }
+.stat-badge.s1{ background:var(--amber); } .stat-badge.s2{ background:var(--slate); } .stat-badge.s3{ background:var(--sage); } .stat-badge.na{ background:#B9B2A0; }
+.insight-cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
+.insight-box{ border:1px solid var(--line); border-radius:10px; padding:11px 13px; background:#FEFDFB; }
+.insight-box h4{ margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
+.insight-box ul{ margin:0; padding-left:16px; font-size:12.5px; }
+.insight-box li{ margin-bottom:4px; }
+.insight-empty{ font-size:12px; color:var(--ink-soft); font-style:italic; }
+@media (max-width:700px){ .insight-cols{ grid-template-columns:1fr; } }
+
+/* monthly tables */
+.month-row{ display:grid; grid-template-columns:120px 150px 1fr; gap:10px; align-items:end; padding:10px 0; border-bottom:1px solid var(--line); }
+.month-row:last-child{ border-bottom:none; }
+.month-row.wide4{ grid-template-columns:110px 110px 100px 1fr; }
+.field{ flex:1; display:flex; flex-direction:column; gap:4px; }
+.chart-label{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-top:14px; margin-bottom:4px; }
+.bar-chart{ display:flex; align-items:flex-end; gap:14px; height:90px; margin-top:6px; padding:0 6px; }
+.bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.bar-col .bar{ width:100%; max-width:46px; background:var(--clay); border-radius:4px 4px 0 0; }
+.bar-col .bar-val{ font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); margin-bottom:4px; }
+.bar-col .bar-label{ font-size:10.5px; color:var(--ink-soft); margin-top:6px; text-align:center; }
+
+.entry{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:#FEFDFB; }
+.entry-row{ display:flex; gap:10px; align-items:flex-start; }
+.entry-row > textarea{ flex:1; }
+.entry-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.entry-index{ font-size:11px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; }
+.next-fields{ display:grid; grid-template-columns:2fr 1fr 1.4fr; gap:10px; }
+.empty-block-msg{ font-size:13px; color:var(--ink-soft); font-style:italic; }
+.aspiration-grid{ display:grid; grid-template-columns:1fr; gap:14px; }
+.aspiration-grid .field.half{ max-width:280px; }
+.readonly-box{ background:#f7f7f5; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:13.5px; color:var(--ink-soft); white-space:pre-wrap; }
+
+/* team dashboards (quadro gerencial) */
+.quadrant-wrap h2{ font-size:26px; margin:0 0 10px; }
+.quadrant-wrap > p{ color:var(--ink-soft); max-width:640px; margin-bottom:24px; }
+.quadrant-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start; }
+@media (max-width: 860px){ .quadrant-grid{ grid-template-columns:1fr; } }
+.qcol{ border-radius:14px; border:1px solid var(--line); background:var(--card); overflow:hidden; display:flex; flex-direction:column; }
+.qcol-head{ padding:16px 16px 14px; }
+.qcol-head .qname{ font-family:'Fraunces',serif; font-size:17px; font-weight:600; margin:0 0 6px; }
+.qcol-head .qcount{ font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
+.qcol-body{ padding:12px; display:flex; flex-direction:column; gap:10px; flex:1; }
+.qcard{ border:1px solid var(--line); border-radius:10px; padding:11px 12px; cursor:pointer; background:#FEFDFB; }
+.qcard:hover{ border-color:var(--pine); }
+.qcard .qcard-name{ font-weight:600; font-size:13.5px; }
+.qcard .qcard-date{ font-size:11px; color:var(--ink-soft); margin-top:1px; }
+.qcard-empty-msg{ font-size:12px; color:var(--ink-soft); font-style:italic; padding:6px 2px; }
+.heatmap-table{ font-size:11px; }
+.heatmap-table th, .heatmap-table td{ padding:6px 8px; white-space:nowrap; }
+.heatmap-table th.heatmap-sticky, .heatmap-table td.heatmap-sticky{ position:sticky; left:0; background:#F6F3EC; white-space:normal; min-width:150px; }
+.heatmap-table td.heatmap-sticky{ background:#fff; }
+table.rp-compare-table{ width:100%; border-collapse:collapse; margin-bottom:6px; }
+table.rp-compare-table th, table.rp-compare-table td{ border:1px solid #ddd; padding:7px 9px; text-align:left; font-size:11.5px; vertical-align:top; }
+table.rp-compare-table th{ background:#F6F3EC; font-weight:600; }
+
+@media (max-width: 900px){
+  .sidebar{ width:100%; min-width:0; position:relative; max-height:none; }
+  .timeline{ max-height:280px; }
+  .app-shell.unlocked{ flex-direction:column; }
+  .main{ padding:22px 16px 60px; }
+  .next-fields{ grid-template-columns:1fr; }
+  .comp-row{ flex-direction:column; align-items:flex-start; }
+  .month-row, .month-row.wide4{ grid-template-columns:1fr; }
+  .radar-wrap{ flex-direction:column; }
+}
+
+.print-only{ display:none; }
+@media print{
+  @page{ margin:16mm; }
+  body *{ visibility:hidden; }
+  #printArea, #printArea *{ visibility:visible; }
+  #printArea{ display:block !important; position:absolute; left:0; top:0; width:100%; }
+}
+.rp-page{ font-family:'Inter',sans-serif; color:#1a1a1a; font-size:12.5px; line-height:1.5; }
+.rp-header{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--pine); padding-bottom:12px; margin-bottom:18px; }
+.rp-header h1{ font-family:'Fraunces',serif; font-size:22px; margin:0; color:var(--pine-dark); }
+.rp-meta{ font-size:11.5px; color:#555; }
+.rp-official-box{ background:var(--amber-bg); border-radius:10px; padding:14px 18px; margin-bottom:20px; }
+.rp-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:#4A5A50; }
+.rp-section-title{ font-family:'Fraunces',serif; font-size:14.5px; font-weight:600; margin:20px 0 8px; border-bottom:1px solid #ddd; padding-bottom:4px; color:var(--pine-dark); }
+.rp-pill{ display:inline-block; padding:2px 9px; border-radius:999px; color:#fff; font-size:10.5px; font-weight:600; }
+.rp-pill.s1, .rp-pill.l1{ background:var(--amber); } .rp-pill.s2, .rp-pill.l2{ background:var(--slate); } .rp-pill.s3, .rp-pill.l3{ background:var(--sage); } .rp-pill.empty{ background:#D9D3C4; color:#6b6b6b; }
+.rp-list{ margin:0 0 4px; padding-left:18px; }
+.rp-list li{ margin-bottom:5px; }
+.rp-empty{ color:#777; font-style:italic; margin:0; }
+.rp-mandala-top{ display:flex; gap:22px; align-items:flex-start; margin-bottom:14px; }
+.rp-mandala-radar{ flex:1.1; min-width:260px; }
+.rp-mandala-stats{ flex:1; min-width:220px; }
+.rp-stat-line{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:11.5px; padding:4.5px 0; border-bottom:1px dashed #ddd; }
+.rp-insight-cols{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:4px; }
+.rp-insight-cols h4{ font-family:'Fraunces',serif; font-size:12.5px; font-weight:600; margin:0 0 6px; color:var(--pine-dark); }
 </style>
 </head>
 <body>
+<div id="printArea" class="print-only"></div>
 
 <!-- ================= HOME ================= -->
 <div id="screenHome">
   <div class="box">
-    <h1>Painel de Autoanálise e Projeção de Carreira</h1>
-    <p>Escolha seu acesso</p>
+    <div class="login-eyebrow">Ciclo de feedback</div>
+    <h1>Feedbacks do Time</h1>
+    <p>Autoanálise, avaliação da gestão e progressão de carreira, tudo em um lugar.</p>
     <div class="links">
-      <a id="goTeam">Sou do time — preencher autoanálise
+      <a id="goTeam">Sou do time — preencher minha autoanálise
         <small>Aberto para todo o time, sem login</small>
       </a>
-      <a id="goManager">Sou gestora — ver progressão do time
+      <a id="goManager">Sou gestora — acompanhar a equipe
         <small>Acesso restrito com login</small>
       </a>
     </div>
   </div>
 </div>
 
-<!-- ================= AUTOANÁLISE (TIME) ================= -->
+<!-- ================= TIME — AUTOANÁLISE ================= -->
 <div id="screenTeam" style="display:none;">
-<div class="wrap wrap-narrow">
+<div style="max-width:840px; margin:0 auto; padding:30px 20px 90px;">
 
-  <div class="topbar">
+  <div class="form-head">
     <div>
-      <h1>Painel de Autoanálise e Projeção de Carreira</h1>
-      <div class="sub">Preencha sua autoanálise a cada ciclo — sua gestora acompanha sua evolução por aqui.</div>
+      <h2 style="font-size:26px;">Autoanálise e Projeção de Carreira</h2>
+      <div class="meta">Preencha a cada ciclo — sua gestora acompanha sua evolução por aqui.</div>
     </div>
-    <button class="link-btn" id="teamGoHome">← Início</button>
+    <button class="btn btn-ghost" id="teamGoHome">← Início</button>
   </div>
 
-  <div class="card" id="formCard">
-    <h2>Seus dados</h2>
-    <div class="desc">Selecione seu nome na lista, ou digite se ainda não estiver cadastrado.</div>
-    <div id="stepSelector">
-      <div>
-        <label for="nomeInput">Nome completo</label>
-        <input type="text" id="nomeInput" list="nomesExistentes" placeholder="Digite ou selecione seu nome" autocomplete="off">
-        <datalist id="nomesExistentes"></datalist>
-      </div>
-      <div>
-        <label for="cargoInput">Cargo atual</label>
-        <input type="text" id="cargoInput" placeholder="ex: Analista Comercial Junior">
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Autoanálise — Pontos Comportamentais</h2>
-    <div class="desc">Para cada ponto, escolha o quadrante que melhor representa você hoje (1 = em desenvolvimento inicial → 4 = referência).</div>
-    <div id="pontosList"></div>
-  </div>
-
-  <div class="card">
-    <h2>Autoanálise — Mandala de Competências</h2>
-    <div class="desc">Dê uma nota de 1 a 3 para cada competência.</div>
-    <div id="competenciasList"></div>
-  </div>
-
-  <div class="card">
-    <h2>Projeção de Crescimento Profissional</h2>
-    <div class="row" style="margin-bottom:0;">
-      <div style="grid-column:1/-1;">
-        <label for="objetivoInput">Objetivo para o próximo ciclo</label>
-        <input type="text" id="objetivoInput" placeholder="ex: Analista Pleno">
+  <section class="block manager">
+    <div class="block-head"><h3>Seus dados</h3></div>
+    <div class="block-body">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div class="field">
+          <label for="nomeInput">Nome completo</label>
+          <input type="text" id="nomeInput" list="nomesExistentes" placeholder="Digite ou selecione seu nome" autocomplete="off">
+          <datalist id="nomesExistentes"></datalist>
+        </div>
+        <div class="field">
+          <label for="cargoInput">Cargo atual</label>
+          <input type="text" id="cargoInput" placeholder="ex: Analista Comercial Junior">
+        </div>
       </div>
     </div>
-    <label for="textoInput" style="margin-top:14px;">O que você acredita precisar desenvolver?</label>
-    <textarea id="textoInput" placeholder="Descreva livremente..."></textarea>
-  </div>
+  </section>
 
-  <div class="card">
-    <button class="btn-primary" id="btnEnviar" style="width:100%;">Enviar minha autoanálise</button>
-    <div class="error-msg" id="errorMsg"></div>
-    <div class="ok-msg" id="okMsg">Autoanálise registrada com sucesso!</div>
-  </div>
+  <section class="block critself">
+    <div class="block-head"><h3>① Autoanálise — Pontos Comportamentais</h3></div>
+    <div class="block-sub">Para cada ponto, escolha a descrição — Quadrante 1, 2 ou 3 — que melhor representa como você se percebe hoje.</div>
+    <div class="block-body" id="critSelfBody"></div>
+    <div style="padding:0 18px 18px;" id="critSelfResult"></div>
+  </section>
 
-  <div class="card" id="resultado">
-    <div class="result-header">
-      <div>
-        <h2 id="rNome"></h2>
-        <div class="cargo" id="rCargo"></div>
-      </div>
-      <div class="meta">
-        Relatório de Autoanálise<br>
-        Data do preenchimento: <span id="rData"></span>
-      </div>
+  <section class="block self">
+    <div class="block-head"><h3>③ Autoanálise — Mandala de Competências</h3></div>
+    <div class="block-sub">Dê uma nota de 1 a 3 para cada competência.</div>
+    <div class="block-body" id="selfScoreBody"></div>
+  </section>
+
+  <section class="block aspiration">
+    <div class="block-head"><h3>⑦ Projeção profissional — aonde quer chegar</h3></div>
+    <div class="block-sub">Registre sua ambição de carreira e onde deseja estar no próximo ciclo de desenvolvimento.</div>
+    <div class="block-body" id="teamAspirationBody"></div>
+  </section>
+
+  <section class="block">
+    <div class="block-body">
+      <button class="btn btn-primary" id="btnEnviar" style="width:100%; justify-content:center; padding:13px;">Enviar minha autoanálise</button>
+      <div class="error-msg" id="teamErrorMsg"></div>
+      <div class="ok-msg" id="teamOkMsg">Autoanálise registrada com sucesso! Sua gestora já pode ver o resultado no painel dela.</div>
     </div>
-    <div class="quad-label">Resultado — Autoanálise Comportamental</div>
-    <div class="quad-value" id="rQuadrante"></div>
-    <table style="margin-top:16px;">
-      <thead><tr><th>Ponto comportamental</th><th>Quadrante escolhido</th></tr></thead>
-      <tbody id="rPontosBody"></tbody>
-    </table>
-    <h2 style="margin-top:26px;">Autoanálise — Mandala de Competências</h2>
-    <div class="radar-wrap"><canvas id="radarChart"></canvas></div>
-    <table>
-      <thead><tr><th>Competência</th><th>Nota (1–3)</th></tr></thead>
-      <tbody id="rCompBody"></tbody>
-    </table>
-    <div class="media-line">Média geral da autoanálise: <b id="rMedia"></b>/3</div>
-    <div style="margin-top:24px; text-align:center;">
-      <button class="btn-secondary" id="btnPdf">Baixar meu resumo em PDF</button>
-    </div>
-  </div>
+  </section>
 
 </div>
 </div>
 
 <!-- ================= GESTORA ================= -->
 <div id="screenManager" style="display:none;">
-<div class="wrap">
 
-  <!-- LOGIN -->
-  <div id="loginScreen">
-    <div class="topbar" style="margin-bottom:20px;">
-      <h1 style="font-size:22px;">Painel da Gestora</h1>
-      <button class="link-btn" id="loginGoHome">← Início</button>
-    </div>
-    <div id="loginScreenBox">
-      <div class="card">
-        <h2>Entrar</h2>
-        <div style="font-size:13px; color:var(--ink-2); margin-bottom:16px;">Acesso restrito à gestão do time.</div>
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <div class="login-eyebrow">Acesso restrito</div>
+      <h1>Painel da Gestora</h1>
+      <p class="login-sub">Informe suas credenciais para continuar.</p>
+      <div class="login-field">
         <label for="loginEmail">E-mail</label>
-        <input type="email" id="loginEmail" style="margin-bottom:14px;">
+        <input type="email" id="loginEmail" autocomplete="username">
+      </div>
+      <div class="login-field">
         <label for="loginSenha">Senha</label>
-        <input type="password" id="loginSenha">
-        <button class="btn-primary" id="btnLogin" style="width:100%; margin-top:18px;">Entrar</button>
-        <div class="error-msg" id="loginError" style="display:none;"></div>
+        <input type="password" id="loginSenha" autocomplete="current-password">
       </div>
+      <div class="error-msg" id="loginError"></div>
+      <button class="btn btn-primary" id="btnLogin" style="width:100%; justify-content:center; margin-top:6px;">Entrar</button>
+      <button class="btn btn-ghost" id="loginGoHome" style="width:100%; justify-content:center; margin-top:10px;">← Início</button>
     </div>
   </div>
 
-  <!-- DASHBOARD -->
-  <div id="dashboard" style="display:none;">
-    <div class="topbar">
-      <div>
-        <h1>Painel da Gestora</h1>
-        <div class="sub">Progressão individual do time — autoanálise x análise da gestora</div>
-      </div>
-      <div class="detail-actions">
-        <button class="link-btn" id="dashGoTeam">Quadro de autoanálise →</button>
-        <button class="link-btn" id="btnLogout">Sair</button>
-      </div>
-    </div>
-
-    <div id="teamView">
-      <input type="text" id="searchBox" placeholder="Buscar por nome ou cargo...">
-      <div class="grid" id="teamGrid"></div>
-      <div class="empty-state" id="emptyState" style="display:none;">Nenhum registro ainda. Assim que o time preencher a autoanálise, os cards aparecem aqui.</div>
-    </div>
-
-    <div id="detailPanel">
-      <button class="link-btn" id="btnVoltar" style="margin-bottom:16px;">← Voltar para o time</button>
-
-      <div class="card" id="pdfReport">
-        <div class="detail-header">
-          <div>
-            <h2 id="dNome"></h2>
-            <div class="cargo" id="dCargo"></div>
-            <div class="quad-history" id="dQuadHistory"></div>
-          </div>
-          <div class="detail-actions" data-html2canvas-ignore>
-            <select id="cycleSelect"></select>
-            <button class="btn-secondary" id="btnGerarPdf">Gerar PDF de evolução</button>
-          </div>
-        </div>
-
-        <div class="section-title">Progressão — média geral por ciclo</div>
-        <div class="legend-row">
-          <span><span class="legend-dot" style="background:#2a78d6;"></span>Autoanálise</span>
-          <span><span class="legend-dot" style="background:#eb6834;"></span>Análise da gestora</span>
-        </div>
-        <div class="chart-box"><canvas id="progressChart" height="90"></canvas></div>
-
-        <div class="section-title">Ciclo selecionado — comparação autoanálise x gestora</div>
-        <div class="two-col">
-          <div>
-            <div class="chart-box"><canvas id="radarCompareChart"></canvas></div>
-          </div>
-          <div>
-            <h2 style="font-size:14px;">Pontos comportamentais</h2>
-            <table>
-              <thead><tr><th>Ponto</th><th>Autoanálise</th><th>Gestora</th></tr></thead>
-              <tbody id="pontosCompareBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <table style="margin-top:16px;">
-          <thead><tr><th>Competência</th><th>Nota autoanálise</th><th>Nota gestora</th></tr></thead>
-          <tbody id="compCompareBody"></tbody>
-        </table>
-
-        <div class="row-2" style="margin-top:18px;">
-          <div>
-            <label>Objetivo do executivo para o próximo ciclo</label>
-            <div class="readonly-box" id="dObjetivo"></div>
-          </div>
-          <div>
-            <label>O que o executivo acredita precisar desenvolver</label>
-            <div class="readonly-box" id="dTexto"></div>
-          </div>
-        </div>
-
-        <div class="section-title">Análise da gestora — ciclo selecionado</div>
-        <div class="row-2">
-          <div>
-            <label for="mStatus">Status na progressão de carreira</label>
-            <select id="mStatus">
-              <option value="">Selecionar...</option>
-              <option value="Em desenvolvimento">Em desenvolvimento</option>
-              <option value="No caminho certo">No caminho certo</option>
-              <option value="Pronto para promoção">Pronto para promoção</option>
-              <option value="Atenção / plano de ação necessário">Atenção / plano de ação necessário</option>
-            </select>
-          </div>
-          <div>
-            <label for="mRecomendacao">Recomendação de próximo cargo</label>
-            <input type="text" id="mRecomendacao" placeholder="ex: Analista Pleno">
-          </div>
-        </div>
-        <div class="row-2" style="margin-top:14px;">
-          <div>
-            <label for="mPontosFortes">Pontos fortes observados</label>
-            <textarea id="mPontosFortes"></textarea>
-          </div>
-          <div>
-            <label for="mPontosDesenvolver">Pontos a desenvolver (visão da gestora)</label>
-            <textarea id="mPontosDesenvolver"></textarea>
-          </div>
-        </div>
-        <label for="mPlanoAcao" style="margin-top:14px;">Plano de ação</label>
-        <textarea id="mPlanoAcao"></textarea>
-
-        <div data-html2canvas-ignore>
-          <button class="btn-primary" id="btnSalvarAnalise" style="margin-top:16px;">Salvar análise da gestora</button>
-          <div class="save-msg" id="saveMsg">Análise salva com sucesso!</div>
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="eyebrow">Painel da gestora</div>
+        <h1>Feedbacks do Time</h1>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-label"><span id="progressText">0 de 0 concluídos</span><span id="progressPct">0%</span></div>
+        <div class="nav-tabs">
+          <button class="nav-tab active" id="navEquipe" type="button">Equipe</button>
+          <button class="nav-tab" id="navQuadro" type="button">Quadro Gerencial</button>
         </div>
       </div>
-    </div>
+      <div class="sidebar-search"><input type="text" id="sidebarSearch" placeholder="Buscar por nome..."></div>
+      <div class="timeline" id="timeline"></div>
+      <div class="sidebar-foot" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn link-btn" id="btnLogout">Sair</button>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="empty-state">
+        <div class="mono" style="color:var(--ink-soft); text-transform:uppercase; letter-spacing:.12em; font-size:11px;">Selecione um(a) colaborador(a)</div>
+        <h2>Roteiro de feedback</h2>
+        <p>Escolha alguém na lista ao lado para ver a autoanálise, preencher a Análise da Gestão, o Feedback Geral com a Mandala de Competências, acionamentos, consumo estratégico e os demais pontos do ciclo.</p>
+        <p>Ou abra o <strong>Quadro Gerencial</strong> para a Matriz de Enquadramento e o comparativo de competências de toda a equipe.</p>
+      </div>
+    </main>
   </div>
-
-</div>
 </div>
 
 <script>
@@ -387,22 +415,143 @@ const SUPABASE_ANON_KEY = "sb_publishable_80NRxK9eLvMZ3XA46Wve_A_stG7-XNm";
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const PONTOS = [
-  'Autonomia','Complexidade das entregas','Conhecimento técnico','Comunicação',
-  'Relacionamento com stakeholders','Trabalho em equipe','Adaptabilidade a mudanças',
-  'Proatividade','Inteligência emocional','Mentoria','Tomada de decisão','Visão de negócio'
+// ---- 12 pontos comportamentais (nome exato = como é salvo no banco) ----
+const CRITERIA = [
+  ["Autonomia",
+    "Atua sob orientação constante, buscando validação antes de tomar decisões.",
+    "Conduz as atividades do dia a dia com autonomia, recorrendo à liderança em situações não usuais.",
+    "Atua com plena autonomia, tomando decisões mesmo em cenários de incerteza."],
+  ["Complexidade das entregas",
+    "Executa entregas pontuais, com escopo e prazo bem delimitados.",
+    "Conduz entregas com múltiplas etapas e interdependência entre diferentes frentes.",
+    "Assume entregas de alta complexidade, com amplo volume de variáveis e impacto relevante para o negócio."],
+  ["Conhecimento técnico",
+    "Encontra-se em desenvolvimento no domínio das ferramentas e processos da função.",
+    "Demonstra domínio consistente das ferramentas e processos inerentes à sua atuação.",
+    "É reconhecido(a) como referência técnica, capaz de solucionar problemas complexos e propor melhorias."],
+  ["Comunicação",
+    "Comunica-se com clareza no relacionamento cotidiano com o time.",
+    "Apresenta ideias e resultados com segurança perante públicos maiores, incluindo outras áreas.",
+    "Utiliza a comunicação como ferramenta de influência em decisões estratégicas."],
+  ["Relacionamento com stakeholders",
+    "Relaciona-se, predominantemente, com o time e a liderança direta.",
+    "Estabelece relacionamento com outras áreas e, eventualmente, com clientes ou parceiros externos.",
+    "Gerencia relacionamentos complexos com múltiplos públicos, incluindo lideranças seniores."],
+  ["Trabalho em equipe",
+    "Contribui quando acionado(a), mantendo atuação predominantemente individual.",
+    "Colabora de forma ativa, alinhando expectativas e integrando sua atuação à do time.",
+    "Mobiliza o time em torno de objetivos comuns e remove obstáculos que impactam o coletivo."],
+  ["Adaptabilidade a mudanças",
+    "Demanda tempo e suporte para se adaptar a mudanças de prioridade ou processo.",
+    "Adapta-se com agilidade a mudanças, reorganizando o próprio ritmo de trabalho.",
+    "Antecipa mudanças e reorganiza planos de forma preventiva, minimizando impactos."],
+  ["Proatividade",
+    "Atua, predominantemente, sobre demandas já formalizadas.",
+    "Identifica problemas e propõe soluções de forma antecipada.",
+    "Antecipa riscos e oportunidades, atuando além do escopo formal quando necessário."],
+  ["Inteligência emocional",
+    "Demonstra receptividade ao feedback, ainda em desenvolvimento no controle emocional sob pressão.",
+    "Mantém-se emocionalmente regulado(a) em situações de pressão moderada.",
+    "Preserva o equilíbrio emocional mesmo sob alta pressão e contribui para o clima do time."],
+  ["Mentoria",
+    "Encontra-se em fase de consolidação do próprio conhecimento e raramente orienta terceiros.",
+    "Apoia, de forma espontânea, colegas menos experientes em demandas do dia a dia.",
+    "Forma outros profissionais de maneira estruturada, sendo reconhecido(a) como referência pelo time."],
+  ["Tomada de decisão",
+    "Segue processos estabelecidos, escalando decisões não previstas à liderança.",
+    "Decide dentro do próprio escopo, avaliando riscos com supervisão moderada.",
+    "Decide em cenários críticos e ambíguos, assumindo responsabilidade integral pelos resultados."],
+  ["Visão de negócio",
+    "Concentra-se na execução da própria atividade, com visão do negócio em desenvolvimento.",
+    "Compreende com clareza a conexão entre suas entregas e os objetivos da área.",
+    "Conecta sua atuação à estratégia da empresa, antecipando necessidades futuras do negócio."],
 ];
+
+// ---- 11 competências da mandala ----
 const COMPETENCIAS = [
-  'Empatia','Autorresponsabilidade','Flexibilidade','Senso de Dono','Ética e Integridade',
-  'Gestão','Respeito à Diversidade','Compromisso Social e Ambiental','Foco na Solução',
-  'Motivação pelo que Faz','Comunicação Assertiva'
+  ["Empatia","Compreende e considera os sentimentos e perspectivas das outras pessoas nas relações de trabalho.","Empatia"],
+  ["Autorresponsabilidade","Assume responsabilidade pelas próprias entregas, decisões e resultados.","Autorresp."],
+  ["Flexibilidade","Adapta-se com facilidade a mudanças de prioridade, contexto ou forma de trabalho.","Flexibilidade"],
+  ["Senso de Dono","Age como responsável pelo resultado, indo além do que é formalmente solicitado.","Senso de Dono"],
+  ["Ética e Integridade","Age de forma coerente com os valores da empresa, mesmo sob pressão.","Ética/Integr."],
+  ["Gestão","Organiza recursos, prazos e prioridades para entregar resultados consistentes.","Gestão"],
+  ["Respeito à Diversidade","Relaciona-se de forma respeitosa e inclusiva com pessoas diferentes de si.","Resp. Diversidade"],
+  ["Compromisso Social e Ambiental","Considera o impacto social e ambiental das próprias decisões e ações.","Compr. Social/Amb."],
+  ["Foco na Solução","Direciona energia para resolver problemas, não apenas identificá-los.","Foco na Solução"],
+  ["Motivação pelo que Faz","Demonstra engajamento genuíno com o propósito do próprio trabalho.","Motivação"],
+  ["Comunicação Assertiva","Expressa-se com clareza e objetividade, mesmo em temas sensíveis.","Comunicação"],
 ];
-const COMPETENCIAS_LABEL_CURTO = {
-  'Empatia':'Empatia','Autorresponsabilidade':'Autorresp.','Flexibilidade':'Flexibilidade',
-  'Senso de Dono':'Senso de Dono','Ética e Integridade':'Ética/Integr.','Gestão':'Gestão',
-  'Respeito à Diversidade':'Resp. Diversidade','Compromisso Social e Ambiental':'Compr. Social/Amb.',
-  'Foco na Solução':'Foco na Solução','Motivação pelo que Faz':'Motivação','Comunicação Assertiva':'Comunicação'
-};
+const SCORE_CAPS = { 1:"Em desenvolvimento", 2:"Consistente", 3:"Referência" };
+const LEVEL_LABELS = { 1:"Quadrante 1", 2:"Quadrante 2", 3:"Quadrante 3" };
+const ASPIRATION_TIMEFRAMES = ["Até 6 meses","6 meses a 1 ano","1 a 2 anos","Mais de 2 anos"];
+const NEXT_CYCLE_OPTIONS = ["Me desenvolver na minha cadeira atual","Analista Júnior","Analista Pleno","Analista Sênior","Supervisão","Coordenação"];
+
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escapeAttr(s){ return (s||'').toString().replace(/"/g,'&quot;'); }
+
+function picksProfile(picksObj){
+  const counts = {1:0,2:0,3:0};
+  let answered = 0;
+  CRITERIA.forEach(c=>{ const v = picksObj[c[0]]; if(v){ counts[v]++; answered++; } });
+  const max = Math.max(counts[1],counts[2],counts[3]);
+  const tied = [1,2,3].filter(l=>counts[l]===max && max>0);
+  const label = tied.length>1 ? ('Entre '+tied.map(t=>LEVEL_LABELS[t]).join(' e ')) : (tied.length===1?LEVEL_LABELS[tied[0]]:'');
+  return { counts, answered, total:CRITERIA.length, predominant:label, predominantKey: tied.length===1?tied[0]:null };
+}
+function scoreStats(scoresObj){
+  const vals = COMPETENCIAS.map(c=>scoresObj[c[0]]).filter(v=>v!==null && v!==undefined && v!=='');
+  const answered = vals.length;
+  const avg = answered ? vals.reduce((a,b)=>a+Number(b),0)/answered : 0;
+  return { answered, total:COMPETENCIAS.length, avg };
+}
+function currentCiclo(d = new Date()){
+  const q = Math.floor(d.getMonth()/3)+1;
+  return `${d.getFullYear()}-Q${q}`;
+}
+function formatDateBR(d){
+  if(!d) return '';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+// ---- radar SVG (mandala de competências) ----
+function buildRadarSVG(mainScores, refScores){
+  const size = 300, cx = size/2 + 50, cy = size/2, maxR = 108;
+  const n = COMPETENCIAS.length;
+  const angleStep = (2*Math.PI)/n;
+  const start = -Math.PI/2;
+  function ptAt(score, i){
+    const angle = start + i*angleStep;
+    const r = score ? (score/3)*maxR : 3;
+    return [cx + r*Math.cos(angle), cy + r*Math.sin(angle)];
+  }
+  let grid = '';
+  [1,2,3].forEach(level=>{
+    const pts = COMPETENCIAS.map((c,i)=>{
+      const angle = start + i*angleStep;
+      const r = (level/3)*maxR;
+      return `${cx+r*Math.cos(angle)},${cy+r*Math.sin(angle)}`;
+    });
+    grid += `<polygon points="${pts.join(' ')}" fill="none" stroke="#E4DCC9" stroke-width="1"/>`;
+  });
+  let axes = '';
+  COMPETENCIAS.forEach((c,i)=>{
+    const angle = start + i*angleStep;
+    const x2 = cx + maxR*Math.cos(angle), y2 = cy + maxR*Math.sin(angle);
+    axes += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#E4DCC9" stroke-width="1"/>`;
+    const lx = cx + (maxR+14)*Math.cos(angle), ly = cy + (maxR+14)*Math.sin(angle);
+    let anchor = 'middle';
+    if(Math.cos(angle) > 0.25) anchor='start'; else if(Math.cos(angle) < -0.25) anchor='end';
+    axes += `<text x="${lx}" y="${ly}" font-size="9" font-family="Inter, sans-serif" fill="#5B6B64" text-anchor="${anchor}" dominant-baseline="middle">${c[2]}</text>`;
+  });
+  function polyFor(scores, color, opacity, dashed){
+    const pts = COMPETENCIAS.map((c,i)=>ptAt(scores[c[0]], i).join(',')).join(' ');
+    return `<polygon points="${pts}" fill="${color}" fill-opacity="${opacity}" stroke="${color}" stroke-width="2" ${dashed?'stroke-dasharray="4,3"':''}/>`;
+  }
+  const mainPoly = polyFor(mainScores, '#A24E68', 0.22, false);
+  const refPoly = refScores ? polyFor(refScores, '#24413B', 0.06, true) : '';
+  return `<svg viewBox="0 0 ${size+140} ${size}" width="100%" style="max-width:440px; display:block; margin:0 auto;">${grid}${axes}${refPoly}${mainPoly}</svg>`;
+}
 
 /* ======================================================================
    NAVEGAÇÃO ENTRE TELAS
@@ -413,65 +562,110 @@ function showScreen(name){
   document.getElementById('screenManager').style.display = name==='manager' ? 'block' : 'none';
   window.scrollTo(0,0);
 }
-document.getElementById('goTeam').addEventListener('click', ()=>{ showScreen('team'); loadExecutivesForDatalist(); });
+document.getElementById('goTeam').addEventListener('click', ()=>{ showScreen('team'); initTeamForm(); });
 document.getElementById('goManager').addEventListener('click', ()=>{ showScreen('manager'); checkSession(); });
 document.getElementById('teamGoHome').addEventListener('click', ()=> showScreen('home'));
 document.getElementById('loginGoHome').addEventListener('click', ()=> showScreen('home'));
-document.getElementById('dashGoTeam').addEventListener('click', ()=>{ showScreen('team'); loadExecutivesForDatalist(); });
 
 /* ======================================================================
-   TELA DO TIME — AUTOANÁLISE
+   TELA DO TIME — AUTOANÁLISE (① ③ ⑦)
    ====================================================================== */
-const state = { pontos:{}, competencias:{} };
-
-const pontosList = document.getElementById('pontosList');
-PONTOS.forEach(ponto=>{
-  const div = document.createElement('div');
-  div.className = 'ponto-item';
-  div.innerHTML = `
-    <div class="titulo">${ponto}</div>
-    <div class="quad-choices">
-      ${[1,2,3,4].map(q=>`<div class="quad-btn" data-ponto="${ponto}" data-q="${q}">Quadrante ${q}</div>`).join('')}
-    </div>`;
-  pontosList.appendChild(div);
-});
-pontosList.addEventListener('click', e=>{
-  const btn = e.target.closest('.quad-btn');
-  if(!btn) return;
-  const ponto = btn.dataset.ponto, q = Number(btn.dataset.q);
-  state.pontos[ponto] = q;
-  pontosList.querySelectorAll(`.quad-btn[data-ponto="${CSS.escape(ponto)}"]`).forEach(b=>b.classList.toggle('active', Number(b.dataset.q)===q));
-});
-
-const compList = document.getElementById('competenciasList');
-COMPETENCIAS.forEach(comp=>{
-  const div = document.createElement('div');
-  div.className = 'comp-item';
-  div.innerHTML = `
-    <div class="titulo">${comp}</div>
-    <div class="nota-choices">
-      ${[1,2,3].map(n=>`<div class="nota-btn" data-comp="${comp}" data-n="${n}">${n}</div>`).join('')}
-    </div>`;
-  compList.appendChild(div);
-});
-compList.addEventListener('click', e=>{
-  const btn = e.target.closest('.nota-btn');
-  if(!btn) return;
-  const comp = btn.dataset.comp, n = Number(btn.dataset.n);
-  state.competencias[comp] = n;
-  compList.querySelectorAll(`.nota-btn[data-comp="${CSS.escape(comp)}"]`).forEach(b=>b.classList.toggle('active', Number(b.dataset.n)===n));
-});
-
+let teamInited = false;
+let teamPicks = {}, teamScores = {}, teamAspiration = { objetivo:'', prazo:'', proximoCiclo:'' };
 let executivesCache = [];
-let datalistLoaded = false;
+
+function initTeamForm(){
+  if(teamInited) return;
+  teamInited = true;
+
+  const critBody = document.getElementById('critSelfBody');
+  critBody.innerHTML = CRITERIA.map(c=>{
+    const nome = c[0];
+    return `
+    <div class="self-row">
+      <span class="self-crit-name">${nome}</span>
+      <div class="pick-grid" data-ponto="${escapeAttr(nome)}">
+        ${[1,2,3].map(lvl=>`
+          <div class="pick-card" data-level="${lvl}">
+            <span class="pick-level">${LEVEL_LABELS[lvl]}</span>
+            <span class="pick-desc">${c[lvl]}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  critBody.querySelectorAll('.pick-grid').forEach(grid=>{
+    const ponto = grid.dataset.ponto;
+    grid.querySelectorAll('.pick-card').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        const lvl = Number(card.dataset.level);
+        teamPicks[ponto] = teamPicks[ponto]===lvl ? null : lvl;
+        grid.querySelectorAll('.pick-card').forEach(c2=>c2.classList.toggle('active', Number(c2.dataset.level)===teamPicks[ponto]));
+        renderTeamPicksResult();
+      });
+    });
+  });
+  renderTeamPicksResult();
+
+  const scoreBody = document.getElementById('selfScoreBody');
+  scoreBody.innerHTML = COMPETENCIAS.map(c=>{
+    const nome=c[0], desc=c[1];
+    return `
+    <div class="comp-row">
+      <div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
+      <div class="score-buttons" data-comp="${escapeAttr(nome)}">
+        ${[1,2,3].map(n=>`<button type="button" class="score-btn" data-score="${n}"><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  scoreBody.querySelectorAll('.score-buttons').forEach(group=>{
+    const comp = group.dataset.comp;
+    group.querySelectorAll('.score-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const n = Number(btn.dataset.score);
+        teamScores[comp] = teamScores[comp]===n ? null : n;
+        group.querySelectorAll('.score-btn').forEach(b=>b.classList.toggle('active', Number(b.dataset.score)===teamScores[comp]));
+      });
+    });
+  });
+
+  const aspBody = document.getElementById('teamAspirationBody');
+  aspBody.innerHTML = `
+    <div class="aspiration-grid">
+      <div class="field"><label>Aonde quer chegar (em suas palavras)</label>
+        <input type="text" id="teamAspGoal" placeholder="Ex: ganhar mais autonomia nas decisões, liderar projetos sozinho(a)..."></div>
+      <div class="field half"><label>Prazo desejado</label>
+        <select id="teamAspTimeframe"><option value="">Selecionar…</option>${ASPIRATION_TIMEFRAMES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Onde você deseja estar no próximo ciclo de desenvolvimento?</label>
+        <select id="teamAspNextCycle"><option value="">Selecionar…</option>${NEXT_CYCLE_OPTIONS.map(t=>`<option value="${t}">${t}</option>`).join('')}</select></div>
+    </div>`;
+
+  loadExecutivesForDatalist();
+}
+
+function renderTeamPicksResult(){
+  const el = document.getElementById('critSelfResult');
+  const prof = picksProfile(teamPicks);
+  if(!prof.answered){
+    el.innerHTML = `<div class="result-panel"><div class="result-empty">Assim que você escolher pelo menos um ponto comportamental acima, o resultado aparece aqui.</div></div>`;
+    return;
+  }
+  const segs = [1,2,3].map(l=>{ const pct=(prof.counts[l]/prof.total)*100; return pct>0?`<div class="result-bar-seg l${l}" style="width:${pct}%"></div>`:''; }).join('');
+  el.innerHTML = `
+    <div class="result-panel">
+      <div class="result-title">Resultado da autoanálise: ${prof.predominant||'—'}</div>
+      <div class="result-bar-track">${segs}</div>
+      <div class="result-legend">
+        ${[1,2,3].map(l=>`<span><span class="legend-dot l${l}"></span>${LEVEL_LABELS[l]}: ${prof.counts[l]}/${prof.total}</span>`).join('')}
+        <span>Respondidos: ${prof.answered}/${prof.total}</span>
+      </div>
+    </div>`;
+}
+
 async function loadExecutivesForDatalist(){
-  if(datalistLoaded) return;
   const { data, error } = await sb.from('executives').select('id,nome,cargo_atual').order('nome');
   if(!error && data){
     executivesCache = data;
-    datalistLoaded = true;
-    const dl = document.getElementById('nomesExistentes');
-    dl.innerHTML = data.map(e=>`<option value="${e.nome.replace(/"/g,'&quot;')}"></option>`).join('');
+    document.getElementById('nomesExistentes').innerHTML = data.map(e=>`<option value="${escapeAttr(e.nome)}"></option>`).join('');
   }
 }
 document.getElementById('nomeInput').addEventListener('change', e=>{
@@ -479,35 +673,19 @@ document.getElementById('nomeInput').addEventListener('change', e=>{
   if(match && match.cargo_atual){ document.getElementById('cargoInput').value = match.cargo_atual; }
 });
 
-function calcQuadranteGeral(pontosVals){
-  const counts = {1:0,2:0,3:0,4:0};
-  pontosVals.forEach(v=>counts[v]++);
-  const max = Math.max(...Object.values(counts));
-  const top = Object.keys(counts).map(Number).filter(k=>counts[k]===max).sort((a,b)=>a-b);
-  if(top.length===1) return `Quadrante ${top[0]}`;
-  if(top.length===2) return `Entre Quadrante ${top[0]} e Quadrante ${top[1]}`;
-  return `Quadrante ${top[0]} (misto)`;
-}
-function currentCiclo(d = new Date()){
-  const q = Math.floor(d.getMonth()/3)+1;
-  return `${d.getFullYear()}-Q${q}`;
-}
-
-let radarChartInstance = null;
-
 document.getElementById('btnEnviar').addEventListener('click', async ()=>{
-  const errorEl = document.getElementById('errorMsg');
-  const okEl = document.getElementById('okMsg');
+  const errorEl = document.getElementById('teamErrorMsg');
+  const okEl = document.getElementById('teamOkMsg');
   errorEl.style.display='none'; okEl.style.display='none';
 
   const nome = document.getElementById('nomeInput').value.trim();
   const cargo = document.getElementById('cargoInput').value.trim();
-  const objetivo = document.getElementById('objetivoInput').value.trim();
-  const texto = document.getElementById('textoInput').value.trim();
 
   if(!nome){ errorEl.textContent='Informe seu nome completo.'; errorEl.style.display='block'; return; }
-  if(Object.keys(state.pontos).length < PONTOS.length){ errorEl.textContent='Responda todos os 12 pontos comportamentais.'; errorEl.style.display='block'; return; }
-  if(Object.keys(state.competencias).length < COMPETENCIAS.length){ errorEl.textContent='Dê nota para todas as 11 competências.'; errorEl.style.display='block'; return; }
+  const pontosRespondidos = CRITERIA.filter(c=>teamPicks[c[0]]).length;
+  if(pontosRespondidos < CRITERIA.length){ errorEl.textContent='Responda todos os 12 pontos comportamentais.'; errorEl.style.display='block'; return; }
+  const compRespondidas = COMPETENCIAS.filter(c=>teamScores[c[0]]).length;
+  if(compRespondidas < COMPETENCIAS.length){ errorEl.textContent='Dê nota para todas as 11 competências.'; errorEl.style.display='block'; return; }
 
   const btn = document.getElementById('btnEnviar');
   btn.disabled = true; btn.textContent = 'Enviando...';
@@ -524,27 +702,26 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
       execId = created.id;
     }
 
-    const pontosVals = PONTOS.map(p=>state.pontos[p]);
-    const compVals = COMPETENCIAS.map(c=>state.competencias[c]);
-    const media = Math.round((compVals.reduce((a,b)=>a+b,0) / compVals.length) * 10) / 10;
-    const quadranteGeral = calcQuadranteGeral(pontosVals);
-    const hoje = new Date().toISOString().slice(0,10);
+    const prof = picksProfile(teamPicks);
+    const stat = scoreStats(teamScores);
+    const media = Math.round(stat.avg*10)/10;
 
     const { data: sa, error: saErr } = await sb.from('self_assessments').insert({
       executive_id: execId,
       ciclo: currentCiclo(),
-      data_preenchimento: hoje,
+      data_preenchimento: new Date().toISOString().slice(0,10),
       cargo_no_preenchimento: cargo || null,
-      quadrante_geral: quadranteGeral,
-      respondidos_pontos: PONTOS.length,
+      quadrante_geral: prof.predominant,
+      respondidos_pontos: CRITERIA.length,
       media_competencias: media,
-      objetivo_proximo_ciclo: objetivo || null,
-      o_que_precisa_desenvolver: texto || null
+      aspiracao_objetivo: document.getElementById('teamAspGoal').value.trim() || null,
+      aspiracao_prazo: document.getElementById('teamAspTimeframe').value || null,
+      aspiracao_proximo_ciclo: document.getElementById('teamAspNextCycle').value || null
     }).select('id').single();
     if(saErr) throw saErr;
 
-    const pontosRows = PONTOS.map(p=>({ self_assessment_id: sa.id, ponto:p, quadrante: state.pontos[p] }));
-    const compRows = COMPETENCIAS.map(c=>({ self_assessment_id: sa.id, competencia:c, nota: state.competencias[c] }));
+    const pontosRows = CRITERIA.map(c=>({ self_assessment_id: sa.id, ponto:c[0], quadrante: teamPicks[c[0]] }));
+    const compRows = COMPETENCIAS.map(c=>({ self_assessment_id: sa.id, competencia:c[0], nota: teamScores[c[0]] }));
     const [{error:pErr}, {error:cErr}] = await Promise.all([
       sb.from('self_assessment_pontos').insert(pontosRows),
       sb.from('self_assessment_competencias').insert(compRows)
@@ -553,78 +730,38 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
     if(cErr) throw cErr;
 
     okEl.style.display='block';
-    document.getElementById('formCard').scrollIntoView({behavior:'smooth'});
-
-    document.getElementById('rNome').textContent = nome;
-    document.getElementById('rCargo').textContent = cargo;
-    document.getElementById('rData').textContent = new Date().toLocaleDateString('pt-BR');
-    document.getElementById('rQuadrante').textContent = quadranteGeral;
-    document.getElementById('rPontosBody').innerHTML = PONTOS.map(p=>`<tr><td>${p}</td><td>Quadrante ${state.pontos[p]}</td></tr>`).join('');
-    document.getElementById('rCompBody').innerHTML = COMPETENCIAS.map(c=>`<tr><td>${c}</td><td>${state.competencias[c]}</td></tr>`).join('');
-    document.getElementById('rMedia').textContent = media.toFixed(1);
-
-    const ctx = document.getElementById('radarChart').getContext('2d');
-    if(radarChartInstance) radarChartInstance.destroy();
-    radarChartInstance = new Chart(ctx, {
-      type:'radar',
-      data:{
-        labels: COMPETENCIAS.map(c=>COMPETENCIAS_LABEL_CURTO[c]),
-        datasets:[{
-          label:'Autoanálise', data: compVals,
-          borderColor:'#2a78d6', backgroundColor:'rgba(42,120,214,0.15)',
-          pointBackgroundColor:'#2a78d6', borderWidth:2
-        }]
-      },
-      options:{
-        scales:{ r:{ min:0, max:3, ticks:{ stepSize:1, backdropColor:'transparent' }, pointLabels:{ font:{size:10} } } },
-        plugins:{ legend:{ display:false } }
-      }
-    });
-
-    document.getElementById('resultado').style.display='block';
-    document.getElementById('resultado').scrollIntoView({behavior:'smooth'});
+    window.scrollTo({top:0, behavior:'smooth'});
   } catch(err){
     console.error(err);
-    errorEl.textContent = 'Não foi possível enviar sua autoanálise. Tente novamente em instantes. (' + (err.message||'') + ')';
+    errorEl.textContent = 'Não foi possível enviar sua autoanálise. (' + (err.message||'') + ')';
     errorEl.style.display='block';
   } finally {
     btn.disabled = false; btn.textContent = 'Enviar minha autoanálise';
   }
 });
 
-document.getElementById('btnPdf').addEventListener('click', async ()=>{
-  const el = document.getElementById('resultado');
-  const canvas = await html2canvas(el, { scale:2, backgroundColor:'#fcfcfb' });
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('p','mm','a4');
-  const pageW = pdf.internal.pageSize.getWidth();
-  const imgW = pageW - 20;
-  const imgH = canvas.height * imgW / canvas.width;
-  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, imgH);
-  const nome = document.getElementById('rNome').textContent || 'autoanalise';
-  pdf.save(`Autoanalise_${nome.replace(/\s+/g,'_')}.pdf`);
-});
-
 /* ======================================================================
    TELA DA GESTORA
    ====================================================================== */
 let currentUser = null;
-let teamData = [];
+let teamData = [];        // [{executive, assessments:[...], managerAssessments:[...]}]
 let activeExec = null;
-let progressChart, radarChart;
+let activeSelf = null;    // self_assessment atualmente selecionado
+let draft = null;         // rascunho editável da análise da gestora
+let currentView = 'equipe';
 
 async function checkSession(){
   const { data: { session } } = await sb.auth.getSession();
-  if(session){ currentUser = session.user; showManagerDashboard(); }
+  if(session){ currentUser = session.user; showManagerApp(); }
   else { showManagerLogin(); }
 }
 function showManagerLogin(){
-  document.getElementById('loginScreen').style.display='block';
-  document.getElementById('dashboard').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('appShell').classList.remove('unlocked');
 }
-function showManagerDashboard(){
+function showManagerApp(){
   document.getElementById('loginScreen').style.display='none';
-  document.getElementById('dashboard').style.display='block';
+  document.getElementById('appShell').classList.add('unlocked');
   loadTeam();
 }
 document.getElementById('btnLogin').addEventListener('click', async ()=>{
@@ -632,321 +769,774 @@ document.getElementById('btnLogin').addEventListener('click', async ()=>{
   const senha = document.getElementById('loginSenha').value;
   const errEl = document.getElementById('loginError');
   errEl.style.display='none';
-
   if(SUPABASE_URL.includes('SEU-PROJETO') || SUPABASE_ANON_KEY.includes('SUA-CHAVE')){
-    errEl.textContent = 'O painel.html ainda não foi configurado: edite as linhas SUPABASE_URL e SUPABASE_ANON_KEY (procure "EDITE AQUI" no arquivo).';
-    errEl.style.display='block';
-    return;
+    errEl.textContent = 'O painel.html ainda não foi configurado: edite SUPABASE_URL e SUPABASE_ANON_KEY (procure "EDITE AQUI").';
+    errEl.style.display='block'; return;
   }
-
   try{
     const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
-    if(error){
-      errEl.textContent = 'Erro ao entrar: ' + error.message + (error.status ? ' (código ' + error.status + ')' : '');
-      errEl.style.display='block';
-      return;
-    }
+    if(error){ errEl.textContent = 'Erro ao entrar: ' + error.message; errEl.style.display='block'; return; }
     currentUser = data.user;
-    showManagerDashboard();
+    showManagerApp();
   } catch(err){
-    errEl.textContent = 'Não foi possível conectar ao Supabase. Confira se SUPABASE_URL e SUPABASE_ANON_KEY no painel.html estão corretos. Detalhe: ' + (err.message || err);
+    errEl.textContent = 'Não foi possível conectar ao Supabase. ' + (err.message||err);
     errEl.style.display='block';
   }
 });
-document.getElementById('btnLogout').addEventListener('click', async ()=>{
-  await sb.auth.signOut();
-  showManagerLogin();
-});
+document.getElementById('btnLogout').addEventListener('click', async ()=>{ await sb.auth.signOut(); showManagerLogin(); });
+
+document.getElementById('navEquipe').addEventListener('click', ()=>{ currentView='equipe'; setActiveTab(); renderSidebarAndMain(); });
+document.getElementById('navQuadro').addEventListener('click', ()=>{ currentView='quadro'; setActiveTab(); renderQuadroGerencial(); });
+function setActiveTab(){
+  document.getElementById('navEquipe').classList.toggle('active', currentView==='equipe');
+  document.getElementById('navQuadro').classList.toggle('active', currentView==='quadro');
+}
+document.getElementById('sidebarSearch').addEventListener('input', ()=>renderTimeline());
 
 async function loadTeam(){
-  const { data: execs, error: execErr } = await sb.from('executives').select('*').order('nome');
-  if(execErr){ console.error(execErr); return; }
-
-  const { data: assessments } = await sb
-    .from('self_assessments')
+  const { data: execs } = await sb.from('executives').select('*').order('nome');
+  const { data: assessments } = await sb.from('self_assessments')
     .select('*, self_assessment_pontos(*), self_assessment_competencias(*)')
     .order('data_preenchimento', { ascending:true });
-
-  const { data: managerAssessments } = await sb
-    .from('manager_assessments')
-    .select('*, manager_assessment_competencias(*), manager_assessment_pontos(*)')
+  const { data: managerAssessments } = await sb.from('manager_assessments')
+    .select('*, manager_assessment_pontos(*), manager_assessment_competencias(*), manager_acionamentos(*), manager_consumo(*), manager_positives(*), manager_develop(*), manager_next_steps(*)')
     .order('data_avaliacao', { ascending:true });
 
-  teamData = execs.map(ex=>({
+  teamData = (execs||[]).map(ex=>({
     executive: ex,
     assessments: (assessments||[]).filter(a=>a.executive_id===ex.id),
     managerAssessments: (managerAssessments||[]).filter(m=>m.executive_id===ex.id)
   }));
 
-  renderTeamGrid();
+  updateProgress();
+  renderSidebarAndMain();
 }
 
-function renderTeamGrid(filterText=''){
-  const grid = document.getElementById('teamGrid');
-  const empty = document.getElementById('emptyState');
-  const filtered = teamData.filter(t=>{
-    const q = filterText.toLowerCase();
-    return t.executive.nome.toLowerCase().includes(q) || (t.executive.cargo_atual||'').toLowerCase().includes(q);
-  });
+function latestSelf(t){ return t.assessments.length ? t.assessments[t.assessments.length-1] : null; }
+function managerForSelf(t, selfId){ return t.managerAssessments.find(m=>m.self_assessment_id===selfId); }
+function latestManager(t){ return t.managerAssessments.length ? t.managerAssessments[t.managerAssessments.length-1] : null; }
 
-  if(filtered.length===0){ grid.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
+function updateProgress(){
+  const total = teamData.length;
+  const done = teamData.filter(t=>{ const m = latestManager(t); return m && m.concluido; }).length;
+  const pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressText').textContent = done+' de '+total+' concluídos';
+  document.getElementById('progressPct').textContent = pct+'%';
+}
 
-  grid.innerHTML = filtered.map(t=>{
-    const last = t.assessments[t.assessments.length-1];
-    const lastManager = t.managerAssessments[t.managerAssessments.length-1];
-    const jaAnalisado = last && lastManager && lastManager.self_assessment_id === last.id;
-    let statusBadge = '<span class="badge badge-status-pending">Sem autoanálise</span>';
-    if(last){
-      statusBadge = jaAnalisado
-        ? '<span class="badge badge-status-good">Analisado pela gestora</span>'
-        : '<span class="badge badge-status-warning">Aguardando análise</span>';
-    }
-    return `
-      <div class="exec-card" data-id="${t.executive.id}">
-        <div class="nome">${t.executive.nome}</div>
-        <div class="cargo">${t.executive.cargo_atual || '—'}</div>
-        <div class="meta-row">
-          ${last ? `<span class="badge badge-quad">${last.quadrante_geral}</span>` : '<span></span>'}
-          ${statusBadge}
-        </div>
-        <div class="media" style="margin-top:8px;">
-          ${last ? `Média: <b>${Number(last.media_competencias).toFixed(1)}</b>/3 · último preenchimento ${formatDate(last.data_preenchimento)}` : 'Ainda não preencheu'}
-        </div>
+function renderSidebarAndMain(){
+  renderTimeline();
+  if(!activeExec){
+    document.getElementById('main').innerHTML = `
+      <div class="empty-state">
+        <div class="mono" style="color:var(--ink-soft); text-transform:uppercase; letter-spacing:.12em; font-size:11px;">Selecione um(a) colaborador(a)</div>
+        <h2>Roteiro de feedback</h2>
+        <p>Escolha alguém na lista ao lado para ver a autoanálise, preencher a Análise da Gestão, o Feedback Geral com a Mandala de Competências, acionamentos, consumo estratégico e os demais pontos do ciclo.</p>
       </div>`;
-  }).join('');
+  }
+}
 
-  grid.querySelectorAll('.exec-card').forEach(card=>{
-    card.addEventListener('click', ()=> openDetail(card.dataset.id));
+function renderTimeline(){
+  const el = document.getElementById('timeline');
+  const q = (document.getElementById('sidebarSearch').value||'').toLowerCase();
+  const filtered = teamData.filter(t=> t.executive.nome.toLowerCase().includes(q));
+  const pendentes = filtered.filter(t=>{ const m=latestManager(t); return !(m && m.concluido); });
+  const concluidos = filtered.filter(t=>{ const m=latestManager(t); return m && m.concluido; });
+
+  function group(label, list){
+    if(!list.length) return '';
+    return `<div class="week-label mono">${label} (${list.length})</div>` + list.map(t=>{
+      const m = latestManager(t);
+      const done = m && m.concluido;
+      const active = activeExec && activeExec.executive.id===t.executive.id;
+      const last = latestSelf(t);
+      return `<div class="item ${active?'active':''}" data-id="${t.executive.id}">
+        <div class="dot ${done?'done':''}"></div>
+        <div><div class="item-name">${t.executive.nome}</div><div class="item-sub">${last?last.quadrante_geral:'sem autoanálise'}</div></div>
+      </div>`;
+    }).join('');
+  }
+  el.innerHTML = group('Pendentes', pendentes) + group('Concluídos', concluidos);
+  el.querySelectorAll('.item').forEach(row=>{
+    row.addEventListener('click', ()=>selectCollaborator(row.dataset.id));
   });
 }
 
-document.getElementById('searchBox').addEventListener('input', e=>renderTeamGrid(e.target.value));
-
-function formatDate(d){
-  if(!d) return '';
-  const [y,m,day] = d.split('-');
-  return `${day}/${m}/${y}`;
+function emptyDraft(){
+  const picks={}, scores={};
+  CRITERIA.forEach(c=>picks[c[0]]=null);
+  COMPETENCIAS.forEach(c=>scores[c[0]]=null);
+  return {
+    picks, scores,
+    acionamentos: [1,2,3].map(()=>({mes:'',quantidade:'',visitas:'',observacoes:''})),
+    consumo: [1,2,3].map(()=>({mes:'',quantidade:'',observacoes:''})),
+    positives: [], develop: [], nextSteps: [],
+    statusCarreira:'', recomendacao:'', dataFeedback:'', concluido:false,
+    maId: null
+  };
+}
+function draftFromManager(ma){
+  const d = emptyDraft();
+  if(!ma) return d;
+  ma.manager_assessment_pontos.forEach(p=>d.picks[p.ponto]=p.quadrante);
+  ma.manager_assessment_competencias.forEach(c=>d.scores[c.competencia]=c.nota);
+  if(ma.manager_acionamentos && ma.manager_acionamentos.length){
+    d.acionamentos = [1,2,3].map(i=>{
+      const r = ma.manager_acionamentos.find(x=>x.mes_index===i);
+      return r ? {mes:r.mes||'',quantidade:r.quantidade??'',visitas:r.visitas??'',observacoes:r.observacoes||''} : {mes:'',quantidade:'',visitas:'',observacoes:''};
+    });
+  }
+  if(ma.manager_consumo && ma.manager_consumo.length){
+    d.consumo = [1,2,3].map(i=>{
+      const r = ma.manager_consumo.find(x=>x.mes_index===i);
+      return r ? {mes:r.mes||'',quantidade:r.quantidade??'',observacoes:r.observacoes||''} : {mes:'',quantidade:'',observacoes:''};
+    });
+  }
+  d.positives = (ma.manager_positives||[]).sort((a,b)=>a.ordem-b.ordem).map(p=>({texto:p.texto}));
+  d.develop = (ma.manager_develop||[]).sort((a,b)=>a.ordem-b.ordem).map(p=>({texto:p.texto}));
+  d.nextSteps = (ma.manager_next_steps||[]).sort((a,b)=>a.ordem-b.ordem).map(p=>({acao:p.acao||'',prazo:p.prazo||'',acompanhamento:p.acompanhamento||''}));
+  d.statusCarreira = ma.status_carreira || '';
+  d.recomendacao = ma.recomendacao_proximo_cargo || '';
+  d.dataFeedback = ma.data_feedback || '';
+  d.concluido = !!ma.concluido;
+  d.maId = ma.id;
+  return d;
 }
 
-function openDetail(execId){
+function selectCollaborator(execId){
   activeExec = teamData.find(t=>t.executive.id===execId);
   if(!activeExec) return;
-  document.getElementById('teamView').style.display='none';
-  document.getElementById('detailPanel').style.display='block';
-
-  document.getElementById('dNome').textContent = activeExec.executive.nome;
-  document.getElementById('dCargo').textContent = activeExec.executive.cargo_atual || '—';
-  document.getElementById('dQuadHistory').innerHTML = activeExec.assessments
-    .map(a=>`<span class="quad-chip">${a.ciclo}: ${a.quadrante_geral}</span>`).join('');
-
-  const sel = document.getElementById('cycleSelect');
-  sel.innerHTML = activeExec.assessments.map(a=>`<option value="${a.id}">${a.ciclo} — ${formatDate(a.data_preenchimento)}</option>`).join('');
-  sel.value = activeExec.assessments.length ? activeExec.assessments[activeExec.assessments.length-1].id : '';
-
-  renderProgressChart();
-  if(activeExec.assessments.length) renderCycle(sel.value);
-  else clearCycleView();
+  activeSelf = latestSelf(activeExec);
+  const ma = activeSelf ? managerForSelf(activeExec, activeSelf.id) : latestManager(activeExec);
+  draft = draftFromManager(ma);
+  renderTimeline();
+  renderPersonForm();
 }
 
-document.getElementById('btnVoltar').addEventListener('click', ()=>{
-  document.getElementById('teamView').style.display='block';
-  document.getElementById('detailPanel').style.display='none';
-});
-document.getElementById('cycleSelect').addEventListener('change', e=> renderCycle(e.target.value));
+function renderPersonForm(){
+  const main = document.getElementById('main');
+  const ex = activeExec.executive;
+  const cycles = activeExec.assessments;
 
-function findManagerFor(selfAssessmentId){
-  return activeExec.managerAssessments.find(m=>m.self_assessment_id===selfAssessmentId);
+  main.innerHTML = `
+    <div class="form-head">
+      <div>
+        <h2>${ex.nome}</h2>
+        <div class="meta">${ex.cargo_atual||'—'}</div>
+        <div class="meta mono" id="cycleSelectWrap" style="margin-top:10px;"></div>
+      </div>
+      <div class="head-actions">
+        <label class="concluded-toggle"><input type="checkbox" id="concludedCheck"> Feedback aplicado</label>
+        <button class="btn btn-ghost" id="btnGerarPdf">Imprimir / Salvar como PDF</button>
+      </div>
+    </div>
+
+    <div class="block" style="border:none; background:none; box-shadow:none; margin-bottom:8px;">
+      <div class="chart-label mono" style="margin:0 0 4px;">Progressão — média geral por ciclo</div>
+      <div style="background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px;">
+        <div class="radar-legend" style="margin-top:0; justify-content:flex-start;">
+          <span><span class="legend-swatch" style="background:#24413B;"></span>Autoanálise</span>
+          <span><span class="legend-swatch" style="background:#A24E68;"></span>Gestora</span>
+        </div>
+        <canvas id="progressChart" height="80"></canvas>
+      </div>
+    </div>
+
+    <section class="block critself">
+      <div class="block-head"><h3>① Autoanálise — Pontos Comportamentais</h3></div>
+      <div class="block-sub">Como o(a) próprio(a) colaborador(a) se percebe (referência, somente leitura).</div>
+      <div class="block-body" id="critSelfRefBody"></div>
+      <div style="padding:0 18px 18px;" id="critSelfRefResult"></div>
+    </section>
+
+    <section class="block critmanager">
+      <div class="block-head"><h3>② Análise da Gestão — Pontos Comportamentais</h3></div>
+      <div class="block-sub">A mesma escala, preenchida por você, para comparar com a autoanálise.</div>
+      <div class="block-body" id="critManagerBody"></div>
+      <div style="padding:0 18px 18px;" id="critManagerResult"></div>
+    </section>
+
+    <section class="block self">
+      <div class="block-head"><h3>③ Autoanálise — Mandala de Competências</h3></div>
+      <div class="block-sub">Notas do(a) próprio(a) colaborador(a) (referência, somente leitura).</div>
+      <div class="block-body" id="selfScoreRefBody"></div>
+    </section>
+
+    <section class="block manager">
+      <div class="block-head"><h3>④ Feedback Geral — avaliação da gestão</h3></div>
+      <div class="block-sub">As notas atribuídas aqui geram a Mandala de Competências oficial e definem o posicionamento do(a) colaborador(a).</div>
+      <div class="block-body" id="managerScoreBody"></div>
+      <div style="padding:0 18px 18px;" id="mandalaPanel"></div>
+    </section>
+
+    <section class="block acionamentos">
+      <div class="block-head"><h3>⑤ Registro de acionamentos</h3></div>
+      <div class="block-sub">Histórico dos últimos 3 meses.</div>
+      <div class="block-body" id="acionamentosBody"></div>
+    </section>
+
+    <section class="block consumo">
+      <div class="block-head"><h3>⑥ Consumo estratégico</h3></div>
+      <div class="block-sub">Ações de consumo estratégico desenvolvidas nos últimos 3 meses.</div>
+      <div class="block-body" id="consumoBody"></div>
+    </section>
+
+    <section class="block aspiration">
+      <div class="block-head"><h3>⑦ Projeção profissional — aonde quer chegar</h3></div>
+      <div class="block-sub">Preenchida pelo(a) próprio(a) colaborador(a) (referência).</div>
+      <div class="block-body" id="aspirationRefBody"></div>
+    </section>
+
+    <section class="block positives">
+      <div class="block-head"><h3>⑧ Pontos positivos</h3><button class="btn btn-add" data-add="positives">+ adicionar</button></div>
+      <div class="block-body" id="positivesBody"></div>
+    </section>
+
+    <section class="block develop">
+      <div class="block-head"><h3>⑨ Pontos a desenvolver</h3><button class="btn btn-add" data-add="develop">+ adicionar</button></div>
+      <div class="block-body" id="developBody"></div>
+    </section>
+
+    <section class="block next">
+      <div class="block-head"><h3>⑩ Próximos passos</h3><button class="btn btn-add" data-add="nextSteps">+ adicionar</button></div>
+      <div class="block-body" id="nextBody"></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>Status e recomendação</h3></div>
+      <div class="block-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div class="field"><label>Status na progressão de carreira</label>
+            <select id="mStatus">
+              <option value="">Selecionar...</option>
+              <option>Em desenvolvimento</option><option>No caminho certo</option>
+              <option>Pronto para promoção</option><option>Atenção / plano de ação necessário</option>
+            </select></div>
+          <div class="field"><label>Recomendação de próximo cargo</label><input type="text" id="mRecomendacao" placeholder="ex: Analista Pleno"></div>
+          <div class="field"><label>Previsão de feedback — data</label><input type="date" id="mDataFeedback"></div>
+        </div>
+        <button class="btn btn-primary" id="btnSalvarAnalise" style="margin-top:16px;">Salvar análise da gestora</button>
+        <div class="ok-msg" id="saveMsg">Análise salva com sucesso!</div>
+      </div>
+    </section>
+  `;
+
+  // seletor de ciclo
+  const wrap = document.getElementById('cycleSelectWrap');
+  if(cycles.length){
+    wrap.innerHTML = `Ciclo: <select id="cycleSelect" style="width:auto; display:inline-block; margin-left:4px;">${cycles.map(c=>`<option value="${c.id}" ${c.id===activeSelf.id?'selected':''}>${c.ciclo} — ${formatDateBR(c.data_preenchimento)}</option>`).join('')}</select>`;
+    document.getElementById('cycleSelect').addEventListener('change', e=>{
+      activeSelf = cycles.find(c=>c.id===e.target.value);
+      const ma = managerForSelf(activeExec, activeSelf.id);
+      draft = draftFromManager(ma);
+      renderPersonForm();
+    });
+  } else {
+    wrap.innerHTML = '<span style="color:var(--ink-soft);">Ainda sem autoanálise registrada.</span>';
+  }
+
+  document.getElementById('concludedCheck').checked = draft.concluido;
+  document.getElementById('mStatus').value = draft.statusCarreira;
+  document.getElementById('mRecomendacao').value = draft.recomendacao;
+  document.getElementById('mDataFeedback').value = draft.dataFeedback || '';
+  document.getElementById('btnGerarPdf').addEventListener('click', printPersonReport);
+  document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click', ()=>{ addEntry(b.dataset.add); }));
+
+  renderCritSelfReference();
+  renderCritManagerEditable();
+  renderSelfScoreReference();
+  renderManagerScoreEditable();
+  renderMandalaPanel();
+  renderMonthBlock('acionamentos','acionamentosBody', ['mes','quantidade','visitas','observacoes'], true);
+  renderMonthBlock('consumo','consumoBody', ['mes','quantidade','observacoes'], false);
+  renderAspirationReference();
+  renderOpenList('positives','positivesBody','PONTO','Ex: qualidade das entregas, proatividade...');
+  renderOpenList('develop','developBody','PONTO','Ex: priorização de demandas, comunicação...');
+  renderNextSteps();
+  renderProgressChartFor(activeExec);
 }
 
-function renderProgressChart(){
-  const ctx = document.getElementById('progressChart').getContext('2d');
-  const labels = activeExec.assessments.map(a=>a.ciclo);
-  const autoData = activeExec.assessments.map(a=>a.media_competencias);
-  const gestoraData = activeExec.assessments.map(a=>{
-    const m = findManagerFor(a.id);
+// ① referência (somente leitura)
+function renderCritSelfReference(){
+  const body = document.getElementById('critSelfRefBody');
+  const picks = {}; if(activeSelf) activeSelf.self_assessment_pontos.forEach(p=>picks[p.ponto]=p.quadrante);
+  body.innerHTML = CRITERIA.map(c=>{
+    const nome=c[0], val=picks[nome];
+    return `<div class="self-row"><span class="self-crit-name">${nome}</span>
+      <div class="pick-grid">${[1,2,3].map(lvl=>`<div class="pick-card readonly ${val===lvl?'active':''}" data-level="${lvl}"><span class="pick-level">${LEVEL_LABELS[lvl]}</span><span class="pick-desc">${c[lvl]}</span></div>`).join('')}</div></div>`;
+  }).join('');
+  const el = document.getElementById('critSelfRefResult');
+  if(!activeSelf){ el.innerHTML = '<div class="result-panel"><div class="result-empty">Sem autoanálise registrada ainda.</div></div>'; return; }
+  const prof = picksProfile(picks);
+  const segs = [1,2,3].map(l=>{ const pct=(prof.counts[l]/prof.total)*100; return pct>0?`<div class="result-bar-seg l${l}" style="width:${pct}%"></div>`:''; }).join('');
+  el.innerHTML = `<div class="result-panel"><div class="result-title">Resultado da autoanálise: ${activeSelf.quadrante_geral}</div>
+    <div class="result-bar-track">${segs}</div>
+    <div class="result-legend">${[1,2,3].map(l=>`<span><span class="legend-dot l${l}"></span>${LEVEL_LABELS[l]}: ${prof.counts[l]}/${prof.total}</span>`).join('')}</div></div>`;
+}
+
+// ② editável pela gestora
+function renderCritManagerEditable(){
+  const body = document.getElementById('critManagerBody');
+  body.innerHTML = CRITERIA.map(c=>{
+    const nome=c[0];
+    return `<div class="self-row"><span class="self-crit-name">${nome}</span>
+      <div class="pick-grid" data-ponto="${escapeAttr(nome)}">${[1,2,3].map(lvl=>`<div class="pick-card ${draft.picks[nome]===lvl?'active':''}" data-level="${lvl}"><span class="pick-level">${LEVEL_LABELS[lvl]}</span><span class="pick-desc">${c[lvl]}</span></div>`).join('')}</div></div>`;
+  }).join('');
+  body.querySelectorAll('.pick-grid').forEach(grid=>{
+    const ponto = grid.dataset.ponto;
+    grid.querySelectorAll('.pick-card').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        const lvl = Number(card.dataset.level);
+        draft.picks[ponto] = draft.picks[ponto]===lvl ? null : lvl;
+        grid.querySelectorAll('.pick-card').forEach(c2=>c2.classList.toggle('active', Number(c2.dataset.level)===draft.picks[ponto]));
+        renderCritManagerResult();
+      });
+    });
+  });
+  renderCritManagerResult();
+}
+function renderCritManagerResult(){
+  const el = document.getElementById('critManagerResult');
+  const prof = picksProfile(draft.picks);
+  if(!prof.answered){ el.innerHTML = `<div class="result-panel"><div class="result-empty">Assim que você escolher pelo menos um ponto, o resultado aparece aqui.</div></div>`; return; }
+  const segs = [1,2,3].map(l=>{ const pct=(prof.counts[l]/prof.total)*100; return pct>0?`<div class="result-bar-seg l${l}" style="width:${pct}%"></div>`:''; }).join('');
+  el.innerHTML = `<div class="result-panel"><div class="result-title">Resultado da análise da gestão: ${prof.predominant}</div>
+    <div class="result-bar-track">${segs}</div>
+    <div class="result-legend">${[1,2,3].map(l=>`<span><span class="legend-dot l${l}"></span>${LEVEL_LABELS[l]}: ${prof.counts[l]}/${prof.total}</span>`).join('')} <span>Respondidos: ${prof.answered}/${prof.total}</span></div></div>`;
+}
+
+// ③ referência (somente leitura)
+function renderSelfScoreReference(){
+  const body = document.getElementById('selfScoreRefBody');
+  const scores = {}; if(activeSelf) activeSelf.self_assessment_competencias.forEach(c=>scores[c.competencia]=c.nota);
+  body.innerHTML = COMPETENCIAS.map(c=>{
+    const nome=c[0], desc=c[1], val=scores[nome];
+    return `<div class="comp-row"><div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
+      <div class="score-buttons">${[1,2,3].map(n=>`<button type="button" class="score-btn readonly ${val===n?'active':''}" disabled><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}</div></div>`;
+  }).join('');
+}
+
+// ④ editável pela gestora
+function renderManagerScoreEditable(){
+  const body = document.getElementById('managerScoreBody');
+  body.innerHTML = COMPETENCIAS.map(c=>{
+    const nome=c[0], desc=c[1];
+    return `<div class="comp-row"><div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
+      <div class="score-buttons" data-comp="${escapeAttr(nome)}">${[1,2,3].map(n=>`<button type="button" class="score-btn ${draft.scores[nome]===n?'active':''}" data-score="${n}"><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}</div></div>`;
+  }).join('');
+  body.querySelectorAll('.score-buttons').forEach(group=>{
+    const comp = group.dataset.comp;
+    group.querySelectorAll('.score-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const n = Number(btn.dataset.score);
+        draft.scores[comp] = draft.scores[comp]===n ? null : n;
+        group.querySelectorAll('.score-btn').forEach(b=>b.classList.toggle('active', Number(b.dataset.score)===draft.scores[comp]));
+        renderMandalaPanel();
+      });
+    });
+  });
+}
+
+function renderMandalaPanel(){
+  const el = document.getElementById('mandalaPanel');
+  const mgrStat = scoreStats(draft.scores);
+  if(!mgrStat.answered){ el.innerHTML = '<div class="insight-empty" style="padding:8px 0;">Preencha as notas da avaliação da gestão acima para gerar a Mandala de Competências.</div>'; return; }
+  const selfScores = {}; if(activeSelf) activeSelf.self_assessment_competencias.forEach(c=>selfScores[c.competencia]=c.nota);
+  const svg = buildRadarSVG(draft.scores, selfScores);
+  const sortedByScore = COMPETENCIAS.map(c=>({name:c[0], score:draft.scores[c[0]]})).filter(c=>c.score!==null);
+  const maxScore = sortedByScore.length ? Math.max(...sortedByScore.map(c=>c.score)) : null;
+  const minScore = sortedByScore.length ? Math.min(...sortedByScore.map(c=>c.score)) : null;
+  const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=2);
+  const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
+  el.innerHTML = `
+    <div class="mandala-sub-title">Mandala de Competências</div>
+    <div class="radar-wrap">
+      <div style="flex:1; min-width:280px;">${svg}
+        <div class="radar-legend"><span><span class="legend-swatch" style="background:#A24E68;"></span>Avaliação da gestão</span><span><span class="legend-swatch" style="background:#24413B; border:1px dashed #24413B;"></span>Autoanálise (referência)</span></div>
+      </div>
+      <div class="stats-col">
+        <div class="stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)} / 3</strong></div>
+        <div class="stat-line"><span>Competências avaliadas</span><strong>${mgrStat.answered}/${mgrStat.total}</strong></div>
+        ${COMPETENCIAS.map(c=>{ const s=draft.scores[c[0]]; return `<div class="stat-line"><span>${c[0]}</span><span class="stat-badge ${s?'s'+s:'na'}">${s?('Quadrante '+s):'—'}</span></div>`; }).join('')}
+      </div>
+    </div>
+    <div class="insight-cols">
+      <div class="insight-box"><h4>Principais pontos fortes</h4>${strengths.length?`<ul>${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência com nota de destaque ainda.</div>'}</div>
+      <div class="insight-box"><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul>${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência crítica identificada ainda.</div>'}</div>
+    </div>
+    <div class="insight-box" style="margin-top:14px;"><h4>Prioridades para o PDI</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>Desenvolver <strong>${s.name}</strong> por meio de ações direcionadas, feedback contínuo e acompanhamento no próximo ciclo.</li>`).join('')}</ul>`:'<div class="insight-empty">Defina notas mais baixas em ao menos uma competência para gerar prioridades de PDI.</div>'}</div>
+  `;
+}
+
+// ⑤⑥ tabelas mensais
+const MONTH_CHART_CFG = {
+  acionamentos: [ {key:'quantidade', label:'Acionamentos por mês', color:'var(--clay)'}, {key:'visitas', label:'Visitas por mês', color:'var(--teal)'} ],
+  consumo: [ {key:'quantidade', label:'Ações de consumo estratégico por mês', color:'var(--teal)'} ]
+};
+function renderMonthBlock(field, bodyId, keys, wide4){
+  const body = document.getElementById(bodyId);
+  const rows = draft[field].map((row,i)=>{
+    const cells = keys.map(k=>{
+      const val = row[k] ?? '';
+      const label = k==='mes' ? `Mês ${i+1}` : (k==='quantidade' && field==='acionamentos' ? 'Qtd. acionamentos' : k==='quantidade' ? 'Qtd. ações' : k==='visitas' ? 'Qtd. visitas' : 'Observações');
+      const type = (k==='quantidade'||k==='visitas') ? 'number' : 'text';
+      const placeholder = k==='mes' ? 'Ex: Maio/2026' : (k==='observacoes' ? 'Contexto do mês' : '');
+      return `<div class="field"><label>${label}</label><input type="${type}" ${type==='number'?'min="0"':''} data-mk="${field}:${i}:${k}" value="${escapeAttr(val)}" placeholder="${placeholder}"></div>`;
+    }).join('');
+    return `<div class="month-row ${wide4?'wide4':''}">${cells}</div>`;
+  }).join('');
+
+  let charts = '';
+  (MONTH_CHART_CFG[field]||[]).forEach(ch=>{
+    const vals = draft[field].map(r=>parseFloat(r[ch.key])||0);
+    const maxV = Math.max(...vals,1);
+    if(vals.some(v=>v>0)){
+      charts += `<div class="chart-label mono">${ch.label}</div><div class="bar-chart">${draft[field].map((r,i)=>{
+        const v = parseFloat(r[ch.key])||0; const h = Math.round((v/maxV)*70)+4;
+        return `<div class="bar-col"><span class="bar-val">${r[ch.key]||0}</span><div class="bar" style="height:${h}px; background:${ch.color};"></div><span class="bar-label">${escapeHtml(r.mes)||('Mês '+(i+1))}</span></div>`;
+      }).join('')}</div>`;
+    }
+  });
+
+  body.innerHTML = `<div class="entry">${rows}</div>${charts}`;
+  body.querySelectorAll('[data-mk]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const [f, idx, k] = e.target.dataset.mk.split(':');
+      draft[f][idx][k] = e.target.value;
+      renderMonthBlock(field, bodyId, keys, wide4);
+    });
+  });
+}
+
+// ⑦ referência
+function renderAspirationReference(){
+  const body = document.getElementById('aspirationRefBody');
+  if(!activeSelf || (!activeSelf.aspiracao_objetivo && !activeSelf.aspiracao_prazo && !activeSelf.aspiracao_proximo_ciclo)){
+    body.innerHTML = '<div class="empty-block-msg">Ainda não preenchida pelo(a) colaborador(a).</div>'; return;
+  }
+  body.innerHTML = `<div class="readonly-box">
+    <strong>Aonde quer chegar:</strong> ${escapeHtml(activeSelf.aspiracao_objetivo)||'—'}<br>
+    <strong>Prazo desejado:</strong> ${activeSelf.aspiracao_prazo||'—'}<br>
+    <strong>Próximo ciclo de desenvolvimento:</strong> ${activeSelf.aspiracao_proximo_ciclo||'—'}
+  </div>`;
+}
+
+// ⑧⑨ listas simples / ⑩ próximos passos
+function addEntry(kind){
+  if(kind==='positives'||kind==='develop') draft[kind].push({texto:''});
+  if(kind==='nextSteps') draft.nextSteps.push({acao:'',prazo:'',acompanhamento:''});
+  if(kind==='positives') renderOpenList('positives','positivesBody','PONTO','Ex: qualidade das entregas, proatividade...');
+  if(kind==='develop') renderOpenList('develop','developBody','PONTO','Ex: priorização de demandas, comunicação...');
+  if(kind==='nextSteps') renderNextSteps();
+}
+function removeEntry(kind, idx){
+  draft[kind].splice(idx,1);
+  if(kind==='positives') renderOpenList('positives','positivesBody','PONTO','Ex: qualidade das entregas, proatividade...');
+  if(kind==='develop') renderOpenList('develop','developBody','PONTO','Ex: priorização de demandas, comunicação...');
+  if(kind==='nextSteps') renderNextSteps();
+}
+function renderOpenList(kind, bodyId, tag, placeholder){
+  const body = document.getElementById(bodyId);
+  if(!draft[kind].length){ body.innerHTML = '<div class="empty-block-msg">Nenhum ponto adicionado ainda.</div>'; return; }
+  body.innerHTML = draft[kind].map((it,i)=>`
+    <div class="entry">
+      <div class="entry-top"><span class="entry-index mono">${tag} ${i+1}</span><button class="btn-remove" data-remove="${kind}:${i}">✕</button></div>
+      <div class="entry-row"><textarea data-k="${kind}:${i}:texto" placeholder="${placeholder}">${escapeHtml(it.texto)}</textarea></div>
+    </div>`).join('');
+  bindEntryInputs(body);
+}
+function renderNextSteps(){
+  const body = document.getElementById('nextBody');
+  if(!draft.nextSteps.length){ body.innerHTML = '<div class="empty-block-msg">Nenhum próximo passo adicionado ainda.</div>'; return; }
+  body.innerHTML = draft.nextSteps.map((it,i)=>`
+    <div class="entry">
+      <div class="entry-top"><span class="entry-index mono">AÇÃO ${i+1}</span><button class="btn-remove" data-remove="nextSteps:${i}">✕</button></div>
+      <div class="entry-row next-fields">
+        <div class="field"><label>Ação</label><input type="text" data-k="nextSteps:${i}:acao" value="${escapeAttr(it.acao)}" placeholder="O que será feito"></div>
+        <div class="field"><label>Prazo</label><input type="date" data-k="nextSteps:${i}:prazo" value="${escapeAttr(it.prazo)}"></div>
+        <div class="field"><label>Acompanhamento</label><input type="text" data-k="nextSteps:${i}:acompanhamento" value="${escapeAttr(it.acompanhamento)}" placeholder="Como/quando será revisado"></div>
+      </div>
+    </div>`).join('');
+  bindEntryInputs(body);
+}
+function bindEntryInputs(container){
+  container.querySelectorAll('[data-k]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const [kind, idx, field] = e.target.dataset.k.split(':');
+      draft[kind][idx][field] = e.target.value;
+    });
+  });
+  container.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const [kind, idx] = e.target.dataset.remove.split(':');
+      removeEntry(kind, parseInt(idx,10));
+    });
+  });
+}
+
+// ---- progressão por ciclo (gráfico próprio, além do padrão original) ----
+let progressChartInstance = null;
+function renderProgressChartFor(t){
+  const ctx = document.getElementById('progressChart');
+  if(!ctx) return;
+  const labels = t.assessments.map(a=>a.ciclo);
+  const autoData = t.assessments.map(a=>a.media_competencias);
+  const gestoraData = t.assessments.map(a=>{
+    const m = managerForSelf(t, a.id);
     if(!m || !m.manager_assessment_competencias.length) return null;
     const vals = m.manager_assessment_competencias.map(c=>c.nota);
     return Math.round((vals.reduce((x,y)=>x+y,0)/vals.length)*10)/10;
   });
-
-  if(progressChart) progressChart.destroy();
-  progressChart = new Chart(ctx, {
+  if(progressChartInstance) progressChartInstance.destroy();
+  progressChartInstance = new Chart(ctx.getContext('2d'), {
     type:'line',
-    data:{
-      labels,
-      datasets:[
-        { label:'Autoanálise', data:autoData, borderColor:'#2a78d6', backgroundColor:'#2a78d6', tension:.25, spanGaps:true, pointRadius:4 },
-        { label:'Gestora', data:gestoraData, borderColor:'#eb6834', backgroundColor:'#eb6834', tension:.25, spanGaps:true, pointRadius:4 }
-      ]
-    },
-    options:{
-      plugins:{ legend:{ display:false } },
-      scales:{ y:{ min:0, max:3, ticks:{ stepSize:1 } } }
-    }
+    data:{ labels, datasets:[
+      { label:'Autoanálise', data:autoData, borderColor:'#24413B', backgroundColor:'#24413B', tension:.25, spanGaps:true, pointRadius:4 },
+      { label:'Gestora', data:gestoraData, borderColor:'#A24E68', backgroundColor:'#A24E68', tension:.25, spanGaps:true, pointRadius:4 }
+    ]},
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{min:0,max:3,ticks:{stepSize:1}} } }
   });
 }
 
-function clearCycleView(){
-  document.getElementById('pontosCompareBody').innerHTML = '';
-  document.getElementById('compCompareBody').innerHTML = '';
-  document.getElementById('dObjetivo').textContent = '—';
-  document.getElementById('dTexto').textContent = '—';
-  if(radarChart) radarChart.destroy();
-}
-
-function renderCycle(selfAssessmentId){
-  const sa = activeExec.assessments.find(a=>a.id===selfAssessmentId);
-  if(!sa) return clearCycleView();
-  const ma = findManagerFor(sa.id);
-
-  document.getElementById('dObjetivo').textContent = sa.objetivo_proximo_ciclo || '—';
-  document.getElementById('dTexto').textContent = sa.o_que_precisa_desenvolver || '—';
-
-  const pontosAuto = {}; sa.self_assessment_pontos.forEach(p=>pontosAuto[p.ponto]=p.quadrante);
-  const pontosGestora = {}; if(ma) ma.manager_assessment_pontos.forEach(p=>pontosGestora[p.ponto]=p.quadrante);
-  document.getElementById('pontosCompareBody').innerHTML = PONTOS.map(p=>`
-    <tr>
-      <td>${p}</td>
-      <td>Quadrante ${pontosAuto[p] ?? '—'}</td>
-      <td>
-        <select data-ponto="${p}" class="gestora-ponto-select">
-          <option value="">—</option>
-          ${[1,2,3,4].map(q=>`<option value="${q}" ${pontosGestora[p]===q?'selected':''}>Quadrante ${q}</option>`).join('')}
-        </select>
-      </td>
-    </tr>`).join('');
-
-  const compAuto = {}; sa.self_assessment_competencias.forEach(c=>compAuto[c.competencia]=c.nota);
-  const compGestora = {}; if(ma) ma.manager_assessment_competencias.forEach(c=>compGestora[c.competencia]=c.nota);
-  document.getElementById('compCompareBody').innerHTML = COMPETENCIAS.map(c=>`
-    <tr>
-      <td>${c}</td>
-      <td>${compAuto[c] ?? '—'}</td>
-      <td>
-        <select data-comp="${c}" class="gestora-comp-select">
-          <option value="">—</option>
-          ${[1,2,3].map(n=>`<option value="${n}" ${compGestora[c]===n?'selected':''}>${n}</option>`).join('')}
-        </select>
-      </td>
-    </tr>`).join('');
-
-  const ctx = document.getElementById('radarCompareChart').getContext('2d');
-  if(radarChart) radarChart.destroy();
-  const datasets = [{
-    label:'Autoanálise',
-    data: COMPETENCIAS.map(c=>compAuto[c] ?? 0),
-    borderColor:'#2a78d6', backgroundColor:'rgba(42,120,214,0.15)', pointBackgroundColor:'#2a78d6', borderWidth:2
-  }];
-  if(ma){
-    datasets.push({
-      label:'Gestora',
-      data: COMPETENCIAS.map(c=>compGestora[c] ?? 0),
-      borderColor:'#eb6834', backgroundColor:'rgba(235,104,52,0.12)', pointBackgroundColor:'#eb6834', borderWidth:2
-    });
-  }
-  radarChart = new Chart(ctx, {
-    type:'radar',
-    data:{ labels: COMPETENCIAS.map(c=>COMPETENCIAS_LABEL_CURTO[c]), datasets },
-    options:{
-      scales:{ r:{ min:0, max:3, ticks:{ stepSize:1, backdropColor:'transparent' }, pointLabels:{ font:{size:10} } } },
-      plugins:{ legend:{ display:false } }
-    }
-  });
-
-  document.getElementById('mStatus').value = ma?.status_carreira || '';
-  document.getElementById('mRecomendacao').value = ma?.recomendacao_proximo_cargo || '';
-  document.getElementById('mPontosFortes').value = ma?.pontos_fortes || '';
-  document.getElementById('mPontosDesenvolver').value = ma?.pontos_a_desenvolver || '';
-  document.getElementById('mPlanoAcao').value = ma?.plano_de_acao || '';
-  document.getElementById('saveMsg').style.display='none';
-}
-
-document.getElementById('btnSalvarAnalise').addEventListener('click', async ()=>{
-  const selfAssessmentId = document.getElementById('cycleSelect').value;
-  const sa = activeExec.assessments.find(a=>a.id===selfAssessmentId);
-  if(!sa) return;
-
+// ---- salvar análise da gestora ----
+document.getElementById('appShell').addEventListener('click', ()=>{}); // no-op placeholder to keep listeners scoped
+async function salvarAnalise(){
+  if(!activeSelf){ alert('Este(a) colaborador(a) ainda não preencheu a autoanálise — não é possível vincular a análise da gestora a um ciclo.'); return; }
   const btn = document.getElementById('btnSalvarAnalise');
   btn.disabled = true; btn.textContent = 'Salvando...';
-
   try{
-    let ma = findManagerFor(selfAssessmentId);
+    draft.statusCarreira = document.getElementById('mStatus').value;
+    draft.recomendacao = document.getElementById('mRecomendacao').value;
+    draft.dataFeedback = document.getElementById('mDataFeedback').value;
+    draft.concluido = document.getElementById('concludedCheck').checked;
+
     const payload = {
       executive_id: activeExec.executive.id,
-      self_assessment_id: selfAssessmentId,
-      ciclo: sa.ciclo,
+      self_assessment_id: activeSelf.id,
+      ciclo: activeSelf.ciclo,
       data_avaliacao: new Date().toISOString().slice(0,10),
-      status_carreira: document.getElementById('mStatus').value || null,
-      recomendacao_proximo_cargo: document.getElementById('mRecomendacao').value || null,
-      pontos_fortes: document.getElementById('mPontosFortes').value || null,
-      pontos_a_desenvolver: document.getElementById('mPontosDesenvolver').value || null,
-      plano_de_acao: document.getElementById('mPlanoAcao').value || null,
+      data_feedback: draft.dataFeedback || null,
+      concluido: draft.concluido,
+      status_carreira: draft.statusCarreira || null,
+      recomendacao_proximo_cargo: draft.recomendacao || null,
       criado_por: currentUser?.id || null
     };
 
-    let maId;
-    if(ma){
-      maId = ma.id;
+    let maId = draft.maId;
+    if(maId){
       const { error } = await sb.from('manager_assessments').update(payload).eq('id', maId);
       if(error) throw error;
-      await sb.from('manager_assessment_competencias').delete().eq('manager_assessment_id', maId);
-      await sb.from('manager_assessment_pontos').delete().eq('manager_assessment_id', maId);
+      await Promise.all([
+        sb.from('manager_assessment_pontos').delete().eq('manager_assessment_id', maId),
+        sb.from('manager_assessment_competencias').delete().eq('manager_assessment_id', maId),
+        sb.from('manager_acionamentos').delete().eq('manager_assessment_id', maId),
+        sb.from('manager_consumo').delete().eq('manager_assessment_id', maId),
+        sb.from('manager_positives').delete().eq('manager_assessment_id', maId),
+        sb.from('manager_develop').delete().eq('manager_assessment_id', maId),
+        sb.from('manager_next_steps').delete().eq('manager_assessment_id', maId),
+      ]);
     } else {
       const { data, error } = await sb.from('manager_assessments').insert(payload).select('id').single();
       if(error) throw error;
       maId = data.id;
     }
 
-    const compRows = [];
-    document.querySelectorAll('.gestora-comp-select').forEach(sel=>{
-      if(sel.value) compRows.push({ manager_assessment_id: maId, competencia: sel.dataset.comp, nota: Number(sel.value) });
-    });
-    const pontosRows = [];
-    document.querySelectorAll('.gestora-ponto-select').forEach(sel=>{
-      if(sel.value) pontosRows.push({ manager_assessment_id: maId, ponto: sel.dataset.ponto, quadrante: Number(sel.value) });
-    });
-    if(compRows.length) await sb.from('manager_assessment_competencias').insert(compRows);
-    if(pontosRows.length) await sb.from('manager_assessment_pontos').insert(pontosRows);
+    const pontosRows = CRITERIA.filter(c=>draft.picks[c[0]]).map(c=>({manager_assessment_id:maId, ponto:c[0], quadrante:draft.picks[c[0]]}));
+    const compRows = COMPETENCIAS.filter(c=>draft.scores[c[0]]).map(c=>({manager_assessment_id:maId, competencia:c[0], nota:draft.scores[c[0]]}));
+    const acRows = draft.acionamentos.map((r,i)=>({manager_assessment_id:maId, mes_index:i+1, mes:r.mes||null, quantidade:r.quantidade?Number(r.quantidade):null, visitas:r.visitas?Number(r.visitas):null, observacoes:r.observacoes||null}));
+    const csRows = draft.consumo.map((r,i)=>({manager_assessment_id:maId, mes_index:i+1, mes:r.mes||null, quantidade:r.quantidade?Number(r.quantidade):null, observacoes:r.observacoes||null}));
+    const posRows = draft.positives.filter(p=>p.texto.trim()).map((p,i)=>({manager_assessment_id:maId, texto:p.texto, ordem:i}));
+    const devRows = draft.develop.filter(p=>p.texto.trim()).map((p,i)=>({manager_assessment_id:maId, texto:p.texto, ordem:i}));
+    const nextRows = draft.nextSteps.filter(p=>p.acao.trim()||p.acompanhamento.trim()).map((p,i)=>({manager_assessment_id:maId, acao:p.acao||null, prazo:p.prazo||null, acompanhamento:p.acompanhamento||null, ordem:i}));
+
+    await Promise.all([
+      pontosRows.length ? sb.from('manager_assessment_pontos').insert(pontosRows) : Promise.resolve(),
+      compRows.length ? sb.from('manager_assessment_competencias').insert(compRows) : Promise.resolve(),
+      sb.from('manager_acionamentos').insert(acRows),
+      sb.from('manager_consumo').insert(csRows),
+      posRows.length ? sb.from('manager_positives').insert(posRows) : Promise.resolve(),
+      devRows.length ? sb.from('manager_develop').insert(devRows) : Promise.resolve(),
+      nextRows.length ? sb.from('manager_next_steps').insert(nextRows) : Promise.resolve(),
+    ]);
 
     await loadTeam();
     activeExec = teamData.find(t=>t.executive.id===activeExec.executive.id);
-    document.getElementById('teamView').style.display='none';
-    document.getElementById('detailPanel').style.display='block';
-    renderProgressChart();
-    renderCycle(selfAssessmentId);
+    activeSelf = activeExec.assessments.find(a=>a.id===activeSelf.id) || latestSelf(activeExec);
+    draft = draftFromManager(managerForSelf(activeExec, activeSelf.id));
+    renderPersonForm();
     document.getElementById('saveMsg').style.display='block';
   } catch(err){
     console.error(err);
     alert('Não foi possível salvar a análise. ' + (err.message||''));
   } finally {
-    btn.disabled=false; btn.textContent='Salvar análise da gestora';
+    const b = document.getElementById('btnSalvarAnalise');
+    if(b){ b.disabled=false; b.textContent='Salvar análise da gestora'; }
   }
-});
+}
+document.addEventListener('click', e=>{ if(e.target && e.target.id==='btnSalvarAnalise') salvarAnalise(); });
 
-document.getElementById('btnGerarPdf').addEventListener('click', async ()=>{
-  const el = document.getElementById('pdfReport');
-  const canvas = await html2canvas(el, { scale:2, backgroundColor:'#fcfcfb' });
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('p','mm','a4');
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth - 20;
-  const imgHeight = canvas.height * imgWidth / canvas.width;
-  let heightLeft = imgHeight;
-  let position = 10;
-  const imgData = canvas.toDataURL('image/png');
-  pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-  heightLeft -= (pageHeight - 20);
-  while(heightLeft > 0){
-    position = heightLeft - imgHeight + 10;
-    pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-    heightLeft -= (pageHeight - 20);
+// ---- PDF / impressão ----
+function printPersonReport(){
+  const ex = activeExec.executive;
+  const selfPicks = {}; if(activeSelf) activeSelf.self_assessment_pontos.forEach(p=>selfPicks[p.ponto]=p.quadrante);
+  const selfScores = {}; if(activeSelf) activeSelf.self_assessment_competencias.forEach(c=>selfScores[c.competencia]=c.nota);
+  const mgrStat = scoreStats(draft.scores);
+  const selfStat = scoreStats(selfScores);
+
+  const pill = (s)=> s ? `<span class="rp-pill s${s}">${s}</span>` : `<span class="rp-pill empty">—</span>`;
+  const compareRows = COMPETENCIAS.map(c=>`<tr><td>${c[0]}</td><td>${pill(selfScores[c[0]])}</td><td>${pill(draft.scores[c[0]])}</td></tr>`).join('');
+  const critPill = (lvl)=> lvl ? `<span class="rp-pill l${lvl}">${LEVEL_LABELS[lvl]}</span>` : `<span class="rp-pill empty">—</span>`;
+  const critRows = CRITERIA.map(c=>`<tr><td>${c[0]}</td><td>${critPill(selfPicks[c[0]])}</td><td>${critPill(draft.picks[c[0]])}</td></tr>`).join('');
+
+  let mandalaHtml = '<p class="rp-empty">Avaliação da gestão ainda não preenchida.</p>';
+  if(mgrStat.answered){
+    const svg = buildRadarSVG(draft.scores, selfScores);
+    const sortedByScore = COMPETENCIAS.map(c=>({name:c[0], score:draft.scores[c[0]]})).filter(c=>c.score!==null);
+    const maxScore = Math.max(...sortedByScore.map(c=>c.score));
+    const minScore = Math.min(...sortedByScore.map(c=>c.score));
+    const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=2);
+    const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
+    mandalaHtml = `<div class="rp-mandala-top"><div class="rp-mandala-radar">${svg}</div>
+      <div class="rp-mandala-stats"><div class="rp-stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)}/3</strong></div>
+      <div class="rp-stat-line"><span>Competências avaliadas</span><strong>${mgrStat.answered}/${mgrStat.total}</strong></div>
+      ${COMPETENCIAS.map(c=>`<div class="rp-stat-line"><span>${c[0]}</span>${pill(draft.scores[c[0]])}</div>`).join('')}</div></div>
+      <div class="rp-insight-cols"><div><h4>Principais pontos fortes</h4>${strengths.length?`<ul class="rp-list">${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div>
+      <div><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div></div>`;
   }
-  const nome = (activeExec?.executive?.nome || 'evolucao').replace(/\s+/g,'_');
-  pdf.save(`Evolucao_${nome}_${new Date().toISOString().slice(0,10)}.pdf`);
-});
+
+  const listOrEmpty = arr => arr.length ? `<ul class="rp-list">${arr.map(p=>`<li>${escapeHtml(p.texto)}</li>`).join('')}</ul>` : '<p class="rp-empty">Nenhum ponto registrado.</p>';
+  const nextHtml = draft.nextSteps.length ? `<table class="rp-compare-table"><thead><tr><th>Ação</th><th>Prazo</th><th>Acompanhamento</th></tr></thead><tbody>${draft.nextSteps.map(n=>`<tr><td>${escapeHtml(n.acao)}</td><td>${n.prazo?formatDateBR(n.prazo):'-'}</td><td>${escapeHtml(n.acompanhamento)}</td></tr>`).join('')}</tbody></table>` : '<p class="rp-empty">Nenhum próximo passo registrado.</p>';
+  const acRows = draft.acionamentos.map(r=>`<tr><td>${escapeHtml(r.mes)||'-'}</td><td>${r.quantidade||'-'}</td><td>${r.visitas||'-'}</td><td>${escapeHtml(r.observacoes)||'-'}</td></tr>`).join('');
+  const csRows = draft.consumo.map(r=>`<tr><td>${escapeHtml(r.mes)||'-'}</td><td>${r.quantidade||'-'}</td><td>${escapeHtml(r.observacoes)||'-'}</td></tr>`).join('');
+  const asp = activeSelf ? `<p><strong>Aonde quer chegar:</strong> ${escapeHtml(activeSelf.aspiracao_objetivo)||'—'}<br><strong>Prazo desejado:</strong> ${activeSelf.aspiracao_prazo||'—'}<br><strong>Próximo ciclo:</strong> ${activeSelf.aspiracao_proximo_ciclo||'—'}</p>` : '<p class="rp-empty">Não preenchida.</p>';
+
+  document.getElementById('printArea').innerHTML = `
+    <div class="rp-page">
+      <div class="rp-header"><div><h1>${ex.nome}</h1><div class="rp-meta">${ex.cargo_atual||''} · Ciclo ${activeSelf?activeSelf.ciclo:'—'}</div></div>
+      <div class="rp-meta" style="text-align:right;">Relatório de Evolução<br>Gerado em ${new Date().toLocaleDateString('pt-BR')}</div></div>
+      <div class="rp-official-box"><div class="rp-label">Resumo</div>
+      <div>Média geral da gestão: <strong>${mgrStat.answered?mgrStat.avg.toFixed(1):'—'}/3</strong> · Autoanálise: <strong>${selfStat.answered?selfStat.avg.toFixed(1):'—'}/3</strong> · Status: <strong>${draft.statusCarreira||'—'}</strong></div></div>
+      <div class="rp-section-title">Pontos comportamentais</div>
+      <table class="rp-compare-table"><thead><tr><th>Ponto comportamental</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${critRows}</tbody></table>
+      <div class="rp-section-title">Mandala de Competências</div>${mandalaHtml}
+      <div class="rp-section-title">Comparativo por competência</div>
+      <table class="rp-compare-table"><thead><tr><th>Competência</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${compareRows}</tbody></table>
+      <div class="rp-section-title">Registro de acionamentos</div>
+      <table class="rp-compare-table"><thead><tr><th>Mês</th><th>Qtd. acionamentos</th><th>Qtd. visitas</th><th>Observações</th></tr></thead><tbody>${acRows}</tbody></table>
+      <div class="rp-section-title">Consumo estratégico</div>
+      <table class="rp-compare-table"><thead><tr><th>Mês</th><th>Qtd. ações</th><th>Observações</th></tr></thead><tbody>${csRows}</tbody></table>
+      <div class="rp-section-title">Projeção profissional</div>${asp}
+      <div class="rp-section-title">Pontos positivos</div>${listOrEmpty(draft.positives)}
+      <div class="rp-section-title">Pontos a desenvolver</div>${listOrEmpty(draft.develop)}
+      <div class="rp-section-title">Próximos passos</div>${nextHtml}
+    </div>`;
+  window.print();
+}
+
+/* ======================================================================
+   QUADRO GERENCIAL
+   ====================================================================== */
+const QUAD_INFO = { 1:{label:'Quadrante 1', color:'var(--sage)', bg:'var(--sage-bg)'}, 2:{label:'Quadrante 2', color:'var(--amber)', bg:'var(--amber-bg)'}, 3:{label:'Quadrante 3', color:'var(--slate)', bg:'var(--slate-bg)'} };
+
+function renderQuadroGerencial(){
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="quadrant-wrap">
+      <h2>Quadro Gerencial</h2>
+      <p>Visão executiva consolidada da equipe: distribuição na Matriz de Enquadramento e comparativo de competências da Mandala, com base nas avaliações da gestão.</p>
+      <section class="block"><div class="block-head"><h3>Matriz de Enquadramento</h3></div>
+        <div class="block-sub">Classificação da equipe nos Quadrantes 1, 2 e 3, com base na predominância dos pontos comportamentais avaliados pela gestão.</div>
+        <div class="block-body" id="matrizBody"></div></section>
+      <section class="block"><div class="block-head" style="flex-wrap:wrap; gap:10px;"><h3>Competências da Mandala</h3>
+        <select id="execFilterSelect" style="width:auto; min-width:220px;"><option value="">Todos (comparativo)</option>${teamData.map(t=>`<option value="${t.executive.id}">${t.executive.nome}</option>`).join('')}</select></div>
+        <div class="block-sub">Notas atribuídas pela gestão, com médias, rankings e comparação entre executivos.</div>
+        <div class="block-body" id="competBody"></div></section>
+    </div>`;
+  renderMatriz(document.getElementById('matrizBody'));
+  document.getElementById('execFilterSelect').addEventListener('change', e=>renderCompetMandala(e.target.value));
+  renderCompetMandala('');
+}
+
+function renderMatriz(container){
+  const groups = {1:[],2:[],3:[]}; const unassessed = [];
+  teamData.forEach(t=>{
+    const m = latestManager(t);
+    const picks = {}; if(m) m.manager_assessment_pontos.forEach(p=>picks[p.ponto]=p.quadrante);
+    const prof = picksProfile(picks);
+    if(prof.answered && prof.predominantKey) groups[prof.predominantKey].push(t);
+    else unassessed.push(t);
+  });
+  container.innerHTML = `<div class="quadrant-grid">${[1,2,3].map(k=>`
+    <div class="qcol" style="border-top:3px solid ${QUAD_INFO[k].color};">
+      <div class="qcol-head" style="background:${QUAD_INFO[k].bg};"><div class="qname">${QUAD_INFO[k].label}</div><div class="qcount mono">${groups[k].length} pessoa(s)</div></div>
+      <div class="qcol-body" data-mbody="${k}"></div></div>`).join('')}</div><div id="matrizUnassessed"></div>`;
+  [1,2,3].forEach(k=>{
+    const body = container.querySelector(`[data-mbody="${k}"]`);
+    if(!groups[k].length){ body.innerHTML = '<div class="qcard-empty-msg">Ninguém classificado aqui ainda.</div>'; return; }
+    body.innerHTML = groups[k].map(t=>`<div class="qcard" data-id="${t.executive.id}"><div class="qcard-name">${t.executive.nome}</div><div class="qcard-date mono">${t.executive.cargo_atual||''}</div></div>`).join('');
+    body.querySelectorAll('.qcard').forEach(card=>card.addEventListener('click', ()=>{ currentView='equipe'; setActiveTab(); selectCollaborator(card.dataset.id); }));
+  });
+  const noteHost = container.querySelector('#matrizUnassessed');
+  if(unassessed.length){
+    noteHost.style.cssText = 'margin-top:16px; font-size:13px; color:var(--ink-soft);';
+    noteHost.innerHTML = `<strong>${unassessed.length} pessoa(s)</strong> ainda sem pontos comportamentais avaliados pela gestão: ` +
+      unassessed.map(t=>`<span class="qchip mono" style="cursor:pointer; margin-right:4px; background:#eee; padding:2px 8px; border-radius:999px;" data-jump="${t.executive.id}">${t.executive.nome}</span>`).join(' ');
+    noteHost.querySelectorAll('[data-jump]').forEach(chip=>chip.addEventListener('click', ()=>{ currentView='equipe'; setActiveTab(); selectCollaborator(chip.dataset.jump); }));
+  }
+}
+
+function computeTeamCompetStats(){
+  const perExec = teamData.map(t=>{ const m=latestManager(t); const scores={}; if(m) m.manager_assessment_competencias.forEach(c=>scores[c.competencia]=c.nota); return {t, scores}; });
+  const teamStats = COMPETENCIAS.map(c=>{
+    const vals = perExec.map(p=>p.scores[c[0]]).filter(v=>v!==null && v!==undefined);
+    const avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    let tier = 'sem-dados';
+    if(avg!==null){ tier = avg>=2.4 ? 'forte' : (avg>=1.7 ? 'atencao' : 'critica'); }
+    return { nome:c[0], avg, answered:vals.length, tier };
+  });
+  return { perExec, teamStats };
+}
+function tierBadge(tier){
+  if(tier==='forte') return `<span class="stat-badge s3">Forte</span>`;
+  if(tier==='atencao') return `<span class="stat-badge s1">A desenvolver</span>`;
+  if(tier==='critica') return `<span class="stat-badge" style="background:var(--danger);">Crítica</span>`;
+  return `<span class="stat-badge na">Sem dados</span>`;
+}
+function renderCompetMandala(filterId){
+  const el = document.getElementById('competBody');
+  const { perExec, teamStats } = computeTeamCompetStats();
+  const ranked = teamStats.filter(c=>c.avg!==null).slice().sort((a,b)=>b.avg-a.avg);
+  const topStrong = ranked.slice(0,5), topDevelop = ranked.slice().reverse().slice(0,5);
+  const criticas = teamStats.filter(c=>c.tier==='critica');
+  const rankingHtml = `<div class="insight-cols" style="margin-top:16px;">
+    <div class="insight-box"><h4>Ranking — mais fortes da equipe</h4>${topStrong.length?`<ul>${topStrong.map(c=>`<li>${c.nome} — <strong>${c.avg.toFixed(1)}/3</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Sem notas suficientes ainda.</div>'}</div>
+    <div class="insight-box"><h4>Ranking — maior necessidade de desenvolvimento</h4>${topDevelop.length?`<ul>${topDevelop.map(c=>`<li>${c.nome} — <strong>${c.avg.toFixed(1)}/3</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Sem notas suficientes ainda.</div>'}</div></div>
+    <div class="insight-box" style="margin-top:14px;"><h4>Competências críticas (média abaixo de 1,7)</h4>${criticas.length?`<ul>${criticas.map(c=>`<li>${c.nome} — <strong>${c.avg!==null?c.avg.toFixed(1):'—'}/3</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência em nível crítico no momento.</div>'}</div>`;
+
+  if(!filterId){
+    let table = `<div style="overflow-x:auto;"><table class="rp-compare-table heatmap-table"><thead><tr><th class="heatmap-sticky">Competência</th>${perExec.map(p=>`<th>${p.t.executive.nome.split(' ')[0]}</th>`).join('')}<th>Média equipe</th></tr></thead><tbody>`;
+    COMPETENCIAS.forEach(c=>{
+      const stat = teamStats.find(t=>t.nome===c[0]);
+      table += `<tr><td class="heatmap-sticky" style="font-weight:600;">${c[0]}</td>`;
+      perExec.forEach(p=>{ const s=p.scores[c[0]]; table += `<td style="text-align:center;">${s?`<span class="stat-badge s${s}">${s}</span>`:'<span class="stat-badge na">—</span>'}</td>`; });
+      table += `<td style="text-align:center;">${stat.avg!==null?`<strong>${stat.avg.toFixed(1)}</strong>`:'—'}</td></tr>`;
+    });
+    table += `</tbody></table></div>`;
+    el.innerHTML = table + rankingHtml;
+    return;
+  }
+  const t = teamData.find(x=>x.executive.id===filterId);
+  const m = latestManager(t);
+  const scores = {}; if(m) m.manager_assessment_competencias.forEach(c=>scores[c.competencia]=c.nota);
+  const rows = COMPETENCIAS.map(c=>{
+    const s = scores[c[0]]; const stat = teamStats.find(x=>x.nome===c[0]);
+    const diff = (s!=null && stat.avg!==null) ? (s-stat.avg) : null;
+    return `<tr><td>${c[0]}</td><td style="text-align:center;">${s?`<span class="stat-badge s${s}">${s}</span>`:'<span class="stat-badge na">—</span>'}</td><td style="text-align:center;">${stat.avg!==null?stat.avg.toFixed(1):'—'}</td><td style="text-align:center;">${diff!==null?((diff>0?'+':'')+diff.toFixed(1)):'—'}</td><td style="text-align:center;">${tierBadge(stat.tier)}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<h3 style="font-family:'Fraunces',serif; font-size:16px; margin:0 0 10px; color:var(--pine-dark);">${t.executive.nome}</h3>
+    <table class="rp-compare-table"><thead><tr><th>Competência</th><th>Nota (gestão)</th><th>Média da equipe</th><th>Diferença</th><th>Situação na equipe</th></tr></thead><tbody>${rows}</tbody></table>${rankingHtml}`;
+}
 </script>
 </body>
 </html>
