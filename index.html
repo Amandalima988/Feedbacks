@@ -368,7 +368,9 @@ table.rp-compare-table th{ background:#F0F5F9; font-weight:600; }
     </div>
   </section>
 
-  <section class="block critself">
+  <div class="ok-msg" id="teamFrozenNotice" style="display:none; margin:0 0 20px;">Vimos que você já preencheu a Autoanálise — Pontos Comportamentais e a Projeção Profissional em um ciclo anterior. Esses dados foram mantidos automaticamente — agora é só preencher a Nova Autoanálise — Mandala de Competências abaixo.</div>
+
+  <section class="block critself" id="teamCritSection">
     <div class="block-head"><h3>① Autoanálise — Pontos Comportamentais</h3></div>
     <div class="block-sub">Para cada ponto, escolha a descrição — Quadrante 1, 2 ou 3 — que melhor representa como você se percebe hoje.</div>
     <div class="block-body" id="critSelfBody"></div>
@@ -376,12 +378,12 @@ table.rp-compare-table th{ background:#F0F5F9; font-weight:600; }
   </section>
 
   <section class="block self">
-    <div class="block-head"><h3>③ Nova Autoanálise — Mandala de Competências</h3></div>
+    <div class="block-head"><h3>Nova Autoanálise — Mandala de Competências</h3></div>
     <div class="block-sub">Para cada competência, escolha o nível que melhor representa como você se percebe hoje: Em construção, Em desenvolvimento, Atende ao esperado ou Referência.</div>
     <div class="block-body" id="selfScoreBody"></div>
   </section>
 
-  <section class="block aspiration">
+  <section class="block aspiration" id="teamAspSection">
     <div class="block-head"><h3>⑦ Projeção profissional — aonde quer chegar</h3></div>
     <div class="block-sub">Registre sua ambição de carreira e onde deseja estar no próximo ciclo de desenvolvimento.</div>
     <div class="block-body" id="teamAspirationBody"></div>
@@ -705,27 +707,29 @@ function formatDateBR(d){
 }
 
 // ---- radar SVG (mandala de competências) ----
-function buildRadarSVG(mainScores, refScores){
+function buildRadarSVG(mainScores, refScores, items, maxScale){
+  items = items || DESEMPENHO;
+  maxScale = maxScale || 4;
   const size = 300, cx = size/2 + 50, cy = size/2, maxR = 108;
-  const n = COMPETENCIAS.length;
+  const n = items.length;
   const angleStep = (2*Math.PI)/n;
   const start = -Math.PI/2;
   function ptAt(score, i){
     const angle = start + i*angleStep;
-    const r = score ? (score/3)*maxR : 3;
+    const r = score ? (score/maxScale)*maxR : 3;
     return [cx + r*Math.cos(angle), cy + r*Math.sin(angle)];
   }
   let grid = '';
-  [1,2,3].forEach(level=>{
-    const pts = COMPETENCIAS.map((c,i)=>{
+  for(let level=1; level<=maxScale; level++){
+    const pts = items.map((c,i)=>{
       const angle = start + i*angleStep;
-      const r = (level/3)*maxR;
+      const r = (level/maxScale)*maxR;
       return `${cx+r*Math.cos(angle)},${cy+r*Math.sin(angle)}`;
     });
     grid += `<polygon points="${pts.join(' ')}" fill="none" stroke="#DEE6EC" stroke-width="1"/>`;
-  });
+  }
   let axes = '';
-  COMPETENCIAS.forEach((c,i)=>{
+  items.forEach((c,i)=>{
     const angle = start + i*angleStep;
     const x2 = cx + maxR*Math.cos(angle), y2 = cy + maxR*Math.sin(angle);
     axes += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#DEE6EC" stroke-width="1"/>`;
@@ -735,7 +739,7 @@ function buildRadarSVG(mainScores, refScores){
     axes += `<text x="${lx}" y="${ly}" font-size="9" font-family="Inter, sans-serif" fill="#5B7285" text-anchor="${anchor}" dominant-baseline="middle">${c[2]}</text>`;
   });
   function polyFor(scores, color, opacity, dashed){
-    const pts = COMPETENCIAS.map((c,i)=>ptAt(scores[c[0]], i).join(',')).join(' ');
+    const pts = items.map((c,i)=>ptAt(scores[c[0]], i).join(',')).join(' ');
     return `<polygon points="${pts}" fill="${color}" fill-opacity="${opacity}" stroke="${color}" stroke-width="2" ${dashed?'stroke-dasharray="4,3"':''}/>`;
   }
   const mainPoly = polyFor(mainScores, '#C0492E', 0.22, false);
@@ -763,6 +767,9 @@ document.getElementById('loginGoHome').addEventListener('click', ()=> showScreen
 let teamInited = false;
 let teamPicks = {}, teamScores = {}, teamAspiration = { objetivo:'', prazo:'', proximoCiclo:'' };
 let executivesCache = [];
+let selfAssessmentsCache = {}; // executive_id -> autoanálise mais recente já registrada (para "congelar" ① e ⑦)
+let frozenPriorSelf = null;
+let isFrozenMode = false;
 
 function initTeamForm(){
   if(teamInited) return;
@@ -852,16 +859,43 @@ function renderTeamPicksResult(){
 }
 
 async function loadExecutivesForDatalist(){
-  const { data, error } = await sb.from('executives').select('id,nome,cargo_atual').order('nome');
+  const [{ data, error }, { data: priorSelfs, error: priorErr }] = await Promise.all([
+    sb.from('executives').select('id,nome,cargo_atual').order('nome'),
+    sb.from('self_assessments')
+      .select('id,executive_id,quadrante_geral,respondidos_pontos,aspiracao_objetivo,aspiracao_prazo,aspiracao_proximo_ciclo,self_assessment_pontos(ponto,quadrante)')
+      .order('data_preenchimento', { ascending:true })
+  ]);
   if(!error && data){
     executivesCache = data;
     document.getElementById('nomesExistentes').innerHTML = data.map(e=>`<option value="${escapeAttr(e.nome)}"></option>`).join('');
   }
+  if(!priorErr && priorSelfs){
+    // ordenado do mais antigo pro mais novo: sobrescrevendo, sobra sempre a autoanálise mais recente de cada pessoa
+    selfAssessmentsCache = {};
+    priorSelfs.forEach(sa=>{
+      if(sa.self_assessment_pontos && sa.self_assessment_pontos.length){ selfAssessmentsCache[sa.executive_id] = sa; }
+    });
+  }
+  // se o nome já estava preenchido (ex.: usuário digitou antes dos dados carregarem), reavalia o modo congelado
+  applyFrozenMode(document.getElementById('nomeInput').value.trim());
 }
 document.getElementById('nomeInput').addEventListener('change', e=>{
   const match = executivesCache.find(x=>x.nome.trim().toLowerCase() === e.target.value.trim().toLowerCase());
   if(match && match.cargo_atual){ document.getElementById('cargoInput').value = match.cargo_atual; }
+  applyFrozenMode(e.target.value.trim());
 });
+
+function applyFrozenMode(nomeDigitado){
+  const match = executivesCache.find(x=>x.nome.trim().toLowerCase() === (nomeDigitado||'').toLowerCase());
+  const prior = match ? selfAssessmentsCache[match.id] : null;
+
+  isFrozenMode = !!prior;
+  frozenPriorSelf = prior || null;
+
+  document.getElementById('teamCritSection').style.display = isFrozenMode ? 'none' : '';
+  document.getElementById('teamAspSection').style.display = isFrozenMode ? 'none' : '';
+  document.getElementById('teamFrozenNotice').style.display = isFrozenMode ? 'block' : 'none';
+}
 
 document.getElementById('btnEnviar').addEventListener('click', async ()=>{
   const errorEl = document.getElementById('teamErrorMsg');
@@ -872,8 +906,10 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
   const cargo = document.getElementById('cargoInput').value.trim();
 
   if(!nome){ errorEl.textContent='Informe seu nome completo.'; errorEl.style.display='block'; return; }
-  const pontosRespondidos = CRITERIA.filter(c=>teamPicks[c[0]]).length;
-  if(pontosRespondidos < CRITERIA.length){ errorEl.textContent='Responda todos os 12 pontos comportamentais.'; errorEl.style.display='block'; return; }
+  if(!isFrozenMode){
+    const pontosRespondidos = CRITERIA.filter(c=>teamPicks[c[0]]).length;
+    if(pontosRespondidos < CRITERIA.length){ errorEl.textContent='Responda todos os 12 pontos comportamentais.'; errorEl.style.display='block'; return; }
+  }
   const compRespondidas = DESEMPENHO.filter(c=>teamScores[c[0]]).length;
   if(compRespondidas < DESEMPENHO.length){ errorEl.textContent='Dê uma nota para todas as 11 competências da Mandala.'; errorEl.style.display='block'; return; }
 
@@ -892,25 +928,34 @@ document.getElementById('btnEnviar').addEventListener('click', async ()=>{
       execId = created.id;
     }
 
-    const prof = picksProfile(teamPicks);
     const stat = desempenhoStats(teamScores);
     const media = Math.round(stat.avg*10)/10;
+
+    // ① e ⑦: se a pessoa já tem autoanálise anterior, os dados são "congelados" (repetidos da última vez),
+    // sem reabrir o preenchimento. Só quem nunca respondeu preenche do zero.
+    const quadranteGeral = isFrozenMode ? frozenPriorSelf.quadrante_geral : picksProfile(teamPicks).predominant;
+    const respondidosPontos = isFrozenMode ? (frozenPriorSelf.respondidos_pontos || CRITERIA.length) : CRITERIA.length;
+    const aspiracaoObjetivo = isFrozenMode ? (frozenPriorSelf.aspiracao_objetivo || null) : (document.getElementById('teamAspGoal').value.trim() || null);
+    const aspiracaoPrazo = isFrozenMode ? (frozenPriorSelf.aspiracao_prazo || null) : (document.getElementById('teamAspTimeframe').value || null);
+    const aspiracaoProximoCiclo = isFrozenMode ? (frozenPriorSelf.aspiracao_proximo_ciclo || null) : (document.getElementById('teamAspNextCycle').value || null);
 
     const { data: sa, error: saErr } = await sb.from('self_assessments').insert({
       executive_id: execId,
       ciclo: currentCiclo(),
       data_preenchimento: new Date().toISOString().slice(0,10),
       cargo_no_preenchimento: cargo || null,
-      quadrante_geral: prof.predominant,
-      respondidos_pontos: CRITERIA.length,
+      quadrante_geral: quadranteGeral,
+      respondidos_pontos: respondidosPontos,
       media_desempenho: media,
-      aspiracao_objetivo: document.getElementById('teamAspGoal').value.trim() || null,
-      aspiracao_prazo: document.getElementById('teamAspTimeframe').value || null,
-      aspiracao_proximo_ciclo: document.getElementById('teamAspNextCycle').value || null
+      aspiracao_objetivo: aspiracaoObjetivo,
+      aspiracao_prazo: aspiracaoPrazo,
+      aspiracao_proximo_ciclo: aspiracaoProximoCiclo
     }).select('id').single();
     if(saErr) throw saErr;
 
-    const pontosRows = CRITERIA.map(c=>({ self_assessment_id: sa.id, ponto:c[0], quadrante: teamPicks[c[0]] }));
+    const pontosRows = isFrozenMode
+      ? frozenPriorSelf.self_assessment_pontos.map(p=>({ self_assessment_id: sa.id, ponto:p.ponto, quadrante:p.quadrante }))
+      : CRITERIA.map(c=>({ self_assessment_id: sa.id, ponto:c[0], quadrante: teamPicks[c[0]] }));
     const desempenhoRows = DESEMPENHO.map(c=>({ self_assessment_id: sa.id, comportamento:c[0], nota: teamScores[c[0]] }));
     const [{error:pErr}, {error:cErr}] = await Promise.all([
       sb.from('self_assessment_pontos').insert(pontosRows),
@@ -1289,28 +1334,15 @@ function renderPersonForm(){
     </section>
 
     <section class="block self">
-      <div class="block-head"><h3>③ Autoanálise — Mandala de Competências (escala anterior) <span class="badge badge-info" style="margin-left:8px;">Editável pela gestora</span></h3></div>
-      <div class="block-sub">Notas do(a) colaborador(a) na escala original de 1 a 3, preservada para manter o histórico dos ciclos anteriores.</div>
-      <div class="block-body" id="selfScoreRefBody"></div>
-    </section>
-
-    <section class="block self">
-      <div class="block-head"><h3>③b Nova Autoanálise — Mandala de Competências (Desempenho) <span class="badge badge-info" style="margin-left:8px;">Editável pela gestora</span></h3></div>
-      <div class="block-sub">Nova escala de 1 (Em construção) a 4 (Referência), preenchida pelo(a) colaborador(a) a partir deste ciclo — não substitui a mandala anterior, as duas ficam registradas.</div>
+      <div class="block-head"><h3>③ Nova Autoanálise — Mandala de Competências <span class="badge badge-info" style="margin-left:8px;">Editável pela gestora</span></h3></div>
+      <div class="block-sub">Escala de 1 (Em construção) a 4 (Referência), preenchida pelo(a) colaborador(a).</div>
       <div class="block-body" id="selfDesempenhoBody"></div>
       <div style="padding:0 18px 18px;" id="selfDesempenhoResult"></div>
     </section>
 
     <section class="block manager">
-      <div class="block-head"><h3>④ Feedback Geral — avaliação da gestão (escala anterior)</h3></div>
-      <div class="block-sub">As notas atribuídas aqui geram a Mandala de Competências oficial (escala 1-3) e definem o posicionamento do(a) colaborador(a).</div>
-      <div class="block-body" id="managerScoreBody"></div>
-      <div style="padding:0 18px 18px;" id="mandalaPanel"></div>
-    </section>
-
-    <section class="block manager">
-      <div class="block-head"><h3>④b Feedback Geral — avaliação da gestão (Nova Mandala de Competências)</h3></div>
-      <div class="block-sub">Sua avaliação na nova escala (1 a 4), ao lado da avaliação na escala anterior — nenhuma substitui a outra.</div>
+      <div class="block-head"><h3>④ Feedback Geral — avaliação da gestão (Nova Mandala de Competências)</h3></div>
+      <div class="block-sub">As notas atribuídas aqui geram a Nova Mandala de Competências oficial e definem o posicionamento do(a) colaborador(a).</div>
       <div class="block-body" id="managerDesempenhoBody"></div>
       <div style="padding:0 18px 18px;" id="mandalaPanelDesempenho"></div>
     </section>
@@ -1399,10 +1431,7 @@ function renderPersonForm(){
 
   renderCritSelfReference();
   renderCritManagerEditable();
-  renderSelfScoreReference();
   renderSelfDesempenhoEditable();
-  renderManagerScoreEditable();
-  renderMandalaPanel();
   renderManagerDesempenhoEditable();
   renderMensalSections();
   renderAspirationReference();
@@ -1482,28 +1511,7 @@ function renderCritManagerResult(){
     <div class="result-legend">${[1,2,3].map(l=>`<span><span class="legend-dot l${l}"></span>${LEVEL_LABELS[l]}: ${prof.counts[l]}/${prof.total}</span>`).join('')} <span>Respondidos: ${prof.answered}/${prof.total}</span></div></div>`;
 }
 
-// ③ mandala antiga da autoanálise — agora editável/corrigível pela gestora (grava em selfDraft.selfScoresLegacy)
-function renderSelfScoreReference(){
-  const body = document.getElementById('selfScoreRefBody');
-  if(!activeSelf){ body.innerHTML = '<div class="empty-block-msg">Ainda sem autoanálise registrada para este ciclo.</div>'; return; }
-  body.innerHTML = COMPETENCIAS.map(c=>{
-    const nome=c[0], desc=c[1];
-    return `<div class="comp-row"><div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
-      <div class="score-buttons" data-comp="${escapeAttr(nome)}">${[1,2,3].map(n=>`<button type="button" class="score-btn ${selfDraft.selfScoresLegacy[nome]===n?'active':''}" data-score="${n}"><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}</div></div>`;
-  }).join('');
-  body.querySelectorAll('.score-buttons').forEach(group=>{
-    const comp = group.dataset.comp;
-    group.querySelectorAll('.score-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const n = Number(btn.dataset.score);
-        selfDraft.selfScoresLegacy[comp] = selfDraft.selfScoresLegacy[comp]===n ? null : n;
-        group.querySelectorAll('.score-btn').forEach(b=>b.classList.toggle('active', Number(b.dataset.score)===selfDraft.selfScoresLegacy[comp]));
-      });
-    });
-  });
-}
-
-// ③b nova mandala (Desempenho, escala 1-4) da autoanálise — editável pela gestora (grava em selfDraft.selfDesempenho)
+// ③ nova mandala (Desempenho, escala 1-4) da autoanálise — editável pela gestora (grava em selfDraft.selfDesempenho)
 function renderSelfDesempenhoEditable(){
   const body = document.getElementById('selfDesempenhoBody');
   const el = document.getElementById('selfDesempenhoResult');
@@ -1535,59 +1543,7 @@ function renderSelfDesempenhoResult(){
     <div class="result-legend">${DESEMPENHO.map(c=>{ const v=selfDraft.selfDesempenho[c[0]]; return `<span><span class="legend-dot ${v?'l'+v:''}"></span>${c[2]}: ${v?DESEMPENHO_LEVELS[v].label:'—'}</span>`; }).join('')} <span>Respondidos: ${stat.answered}/${stat.total}</span></div></div>`;
 }
 
-// ④ editável pela gestora
-function renderManagerScoreEditable(){
-  const body = document.getElementById('managerScoreBody');
-  body.innerHTML = COMPETENCIAS.map(c=>{
-    const nome=c[0], desc=c[1];
-    return `<div class="comp-row"><div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
-      <div class="score-buttons" data-comp="${escapeAttr(nome)}">${[1,2,3].map(n=>`<button type="button" class="score-btn ${draft.scores[nome]===n?'active':''}" data-score="${n}"><span class="num">${n}</span><span class="cap">${SCORE_CAPS[n]}</span></button>`).join('')}</div></div>`;
-  }).join('');
-  body.querySelectorAll('.score-buttons').forEach(group=>{
-    const comp = group.dataset.comp;
-    group.querySelectorAll('.score-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const n = Number(btn.dataset.score);
-        draft.scores[comp] = draft.scores[comp]===n ? null : n;
-        group.querySelectorAll('.score-btn').forEach(b=>b.classList.toggle('active', Number(b.dataset.score)===draft.scores[comp]));
-        renderMandalaPanel();
-      });
-    });
-  });
-}
-
-function renderMandalaPanel(){
-  const el = document.getElementById('mandalaPanel');
-  const mgrStat = scoreStats(draft.scores);
-  if(!mgrStat.answered){ el.innerHTML = '<div class="insight-empty" style="padding:8px 0;">Preencha as notas da avaliação da gestão acima para gerar a Mandala de Competências.</div>'; return; }
-  const selfScores = {}; if(activeSelf) activeSelf.self_assessment_competencias.forEach(c=>selfScores[c.competencia]=c.nota);
-  const svg = buildRadarSVG(draft.scores, selfScores);
-  const sortedByScore = COMPETENCIAS.map(c=>({name:c[0], score:draft.scores[c[0]]})).filter(c=>c.score!==null);
-  const maxScore = sortedByScore.length ? Math.max(...sortedByScore.map(c=>c.score)) : null;
-  const minScore = sortedByScore.length ? Math.min(...sortedByScore.map(c=>c.score)) : null;
-  const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=2);
-  const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
-  el.innerHTML = `
-    <div class="mandala-sub-title">Mandala de Competências</div>
-    <div class="radar-wrap">
-      <div style="flex:1; min-width:280px;">${svg}
-        <div class="radar-legend"><span><span class="legend-swatch" style="background:#C0492E;"></span>Avaliação da gestão</span><span><span class="legend-swatch" style="background:#0A2A43; border:1px dashed #0A2A43;"></span>Autoanálise (referência)</span></div>
-      </div>
-      <div class="stats-col">
-        <div class="stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)} / 3</strong></div>
-        <div class="stat-line"><span>Competências avaliadas</span><strong>${mgrStat.answered}/${mgrStat.total}</strong></div>
-        ${COMPETENCIAS.map(c=>{ const s=draft.scores[c[0]]; return `<div class="stat-line"><span>${c[0]}</span><span class="stat-badge ${s?'s'+s:'na'}">${s?('Quadrante '+s):'—'}</span></div>`; }).join('')}
-      </div>
-    </div>
-    <div class="insight-cols">
-      <div class="insight-box"><h4>Principais pontos fortes</h4>${strengths.length?`<ul>${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência com nota de destaque ainda.</div>'}</div>
-      <div class="insight-box"><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul>${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência crítica identificada ainda.</div>'}</div>
-    </div>
-    <div class="insight-box" style="margin-top:14px;"><h4>Prioridades para o PDI</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>Desenvolver <strong>${s.name}</strong> por meio de ações direcionadas, feedback contínuo e acompanhamento no próximo ciclo.</li>`).join('')}</ul>`:'<div class="insight-empty">Defina notas mais baixas em ao menos uma competência para gerar prioridades de PDI.</div>'}</div>
-  `;
-}
-
-// ④b avaliação da gestão na NOVA Mandala (Desempenho, escala 1-4) — editável, ao lado de ④ (escala antiga)
+// ④ avaliação da gestão na Nova Mandala (Desempenho, escala 1-4) — editável
 function renderManagerDesempenhoEditable(){
   const body = document.getElementById('managerDesempenhoBody');
   body.innerHTML = DESEMPENHO.map(c=>{
@@ -1611,18 +1567,25 @@ function renderManagerDesempenhoEditable(){
 function renderMandalaPanelDesempenho(){
   const el = document.getElementById('mandalaPanelDesempenho');
   const mgrStat = desempenhoStats(draft.desempenho);
-  if(!mgrStat.answered){ el.innerHTML = '<div class="insight-empty" style="padding:8px 0;">Preencha as notas da nova avaliação da gestão acima para gerar a Mandala.</div>'; return; }
+  if(!mgrStat.answered){ el.innerHTML = '<div class="insight-empty" style="padding:8px 0;">Preencha as notas da avaliação da gestão acima para gerar a Mandala de Competências.</div>'; return; }
+  const selfDesemp = {}; if(activeSelf) (activeSelf.self_assessment_desempenho||[]).forEach(c=>selfDesemp[c.comportamento]=c.nota);
+  const svg = buildRadarSVG(draft.desempenho, selfDesemp, DESEMPENHO, 4);
   const sortedByScore = DESEMPENHO.map(c=>({name:c[0], score:draft.desempenho[c[0]]})).filter(c=>c.score!==null);
   const maxScore = sortedByScore.length ? Math.max(...sortedByScore.map(c=>c.score)) : null;
   const minScore = sortedByScore.length ? Math.min(...sortedByScore.map(c=>c.score)) : null;
   const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=3);
   const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
   el.innerHTML = `
-    <div class="mandala-sub-title">Nova Mandala de Competências (Desempenho)</div>
-    <div class="stats-col">
-      <div class="stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)} / 4</strong></div>
-      <div class="stat-line"><span>Competências avaliadas</span><strong>${mgrStat.answered}/${mgrStat.total}</strong></div>
-      ${DESEMPENHO.map(c=>{ const s=draft.desempenho[c[0]]; return `<div class="stat-line"><span>${c[0]}</span><span class="stat-badge ${s?'s'+s:'na'}">${s?DESEMPENHO_LEVELS[s].label:'—'}</span></div>`; }).join('')}
+    <div class="mandala-sub-title">Mandala de Competências</div>
+    <div class="radar-wrap">
+      <div style="flex:1; min-width:280px;">${svg}
+        <div class="radar-legend"><span><span class="legend-swatch" style="background:#C0492E;"></span>Avaliação da gestão</span><span><span class="legend-swatch" style="background:#0A2A43; border:1px dashed #0A2A43;"></span>Autoanálise (referência)</span></div>
+      </div>
+      <div class="stats-col">
+        <div class="stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)} / 4</strong></div>
+        <div class="stat-line"><span>Competências avaliadas</span><strong>${mgrStat.answered}/${mgrStat.total}</strong></div>
+        ${DESEMPENHO.map(c=>{ const s=draft.desempenho[c[0]]; return `<div class="stat-line"><span>${c[0]}</span><span class="stat-badge ${s?'s'+s:'na'}">${s?DESEMPENHO_LEVELS[s].label:'—'}</span></div>`; }).join('')}
+      </div>
     </div>
     <div class="insight-cols">
       <div class="insight-box"><h4>Principais pontos fortes</h4>${strengths.length?`<ul>${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência com nota de destaque ainda.</div>'}</div>
@@ -1985,41 +1948,29 @@ document.addEventListener('click', e=>{ if(e.target && e.target.id==='btnSalvarA
 function printPersonReport(){
   const ex = activeExec.executive;
   const selfPicks = {}; if(activeSelf) activeSelf.self_assessment_pontos.forEach(p=>selfPicks[p.ponto]=p.quadrante);
-  const selfScores = {}; if(activeSelf) activeSelf.self_assessment_competencias.forEach(c=>selfScores[c.competencia]=c.nota);
   const selfDesemp = {}; if(activeSelf) (activeSelf.self_assessment_desempenho||[]).forEach(c=>selfDesemp[c.comportamento]=c.nota);
-  const mgrStat = scoreStats(draft.scores);
-  const selfStat = scoreStats(selfScores);
   const mgrStatDesemp = desempenhoStats(draft.desempenho);
   const selfStatDesemp = desempenhoStats(selfDesemp);
 
-  const pill = (s)=> s ? `<span class="rp-pill s${s}">${s}</span>` : `<span class="rp-pill empty">—</span>`;
   const pillDesemp = (s)=> s ? `<span class="rp-pill s${s}">${DESEMPENHO_LEVELS[s].label}</span>` : `<span class="rp-pill empty">—</span>`;
-  const compareRows = COMPETENCIAS.map(c=>`<tr><td>${c[0]}</td><td>${pill(selfScores[c[0]])}</td><td>${pill(draft.scores[c[0]])}</td></tr>`).join('');
   const compareRowsDesemp = DESEMPENHO.map(c=>`<tr><td>${c[0]}</td><td>${pillDesemp(selfDesemp[c[0]])}</td><td>${pillDesemp(draft.desempenho[c[0]])}</td></tr>`).join('');
   const critPill = (lvl)=> lvl ? `<span class="rp-pill l${lvl}">${LEVEL_LABELS[lvl]}</span>` : `<span class="rp-pill empty">—</span>`;
   const critRows = CRITERIA.map(c=>`<tr><td>${c[0]}</td><td>${critPill(selfPicks[c[0]])}</td><td>${critPill(draft.picks[c[0]])}</td></tr>`).join('');
 
-  let mandalaHtml = '<p class="rp-empty">Avaliação da gestão ainda não preenchida (escala anterior).</p>';
-  if(mgrStat.answered){
-    const svg = buildRadarSVG(draft.scores, selfScores);
-    const sortedByScore = COMPETENCIAS.map(c=>({name:c[0], score:draft.scores[c[0]]})).filter(c=>c.score!==null);
+  let mandalaHtmlDesemp = '<p class="rp-empty">Avaliação da gestão ainda não preenchida.</p>';
+  if(mgrStatDesemp.answered){
+    const svg = buildRadarSVG(draft.desempenho, selfDesemp, DESEMPENHO, 4);
+    const sortedByScore = DESEMPENHO.map(c=>({name:c[0], score:draft.desempenho[c[0]]})).filter(c=>c.score!==null);
     const maxScore = Math.max(...sortedByScore.map(c=>c.score));
     const minScore = Math.min(...sortedByScore.map(c=>c.score));
-    const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=2);
+    const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=3);
     const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
-    mandalaHtml = `<div class="rp-mandala-top"><div class="rp-mandala-radar">${svg}</div>
-      <div class="rp-mandala-stats"><div class="rp-stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)}/3</strong></div>
-      <div class="rp-stat-line"><span>Competências avaliadas</span><strong>${mgrStat.answered}/${mgrStat.total}</strong></div>
-      ${COMPETENCIAS.map(c=>`<div class="rp-stat-line"><span>${c[0]}</span>${pill(draft.scores[c[0]])}</div>`).join('')}</div></div>
+    mandalaHtmlDesemp = `<div class="rp-mandala-top"><div class="rp-mandala-radar">${svg}</div>
+      <div class="rp-mandala-stats"><div class="rp-stat-line"><span>Média geral</span><strong>${mgrStatDesemp.avg.toFixed(1)}/4</strong></div>
+      <div class="rp-stat-line"><span>Competências avaliadas</span><strong>${mgrStatDesemp.answered}/${mgrStatDesemp.total}</strong></div>
+      ${DESEMPENHO.map(c=>`<div class="rp-stat-line"><span>${c[0]}</span>${pillDesemp(draft.desempenho[c[0]])}</div>`).join('')}</div></div>
       <div class="rp-insight-cols"><div><h4>Principais pontos fortes</h4>${strengths.length?`<ul class="rp-list">${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div>
       <div><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div></div>`;
-  }
-
-  let mandalaHtmlDesemp = '<p class="rp-empty">Avaliação da gestão ainda não preenchida (nova mandala).</p>';
-  if(mgrStatDesemp.answered){
-    mandalaHtmlDesemp = `<div class="rp-mandala-stats"><div class="rp-stat-line"><span>Média geral</span><strong>${mgrStatDesemp.avg.toFixed(1)}/4</strong></div>
-      <div class="rp-stat-line"><span>Competências avaliadas</span><strong>${mgrStatDesemp.answered}/${mgrStatDesemp.total}</strong></div>
-      ${DESEMPENHO.map(c=>`<div class="rp-stat-line"><span>${c[0]}</span>${pillDesemp(draft.desempenho[c[0]])}</div>`).join('')}</div>`;
   }
 
   const listOrEmpty = arr => arr.length ? `<ul class="rp-list">${arr.map(p=>`<li>${escapeHtml(p.texto)}</li>`).join('')}</ul>` : '<p class="rp-empty">Nenhum ponto registrado.</p>';
@@ -2035,14 +1986,11 @@ function printPersonReport(){
       <div class="rp-header"><div><h1>${ex.nome}</h1><div class="rp-meta">${ex.cargo_atual||''} · Ciclo ${activeSelf?activeSelf.ciclo:'—'}</div></div>
       <div class="rp-meta" style="text-align:right;">Relatório de Evolução<br>Gerado em ${new Date().toLocaleDateString('pt-BR')}</div></div>
       <div class="rp-official-box"><div class="rp-label">Resumo</div>
-      <div>Gestão (escala anterior): <strong>${mgrStat.answered?mgrStat.avg.toFixed(1):'—'}/3</strong> · Autoanálise: <strong>${selfStat.answered?selfStat.avg.toFixed(1):'—'}/3</strong> · Gestão (nova mandala): <strong>${mgrStatDesemp.answered?mgrStatDesemp.avg.toFixed(1):'—'}/4</strong> · Autoanálise (nova mandala): <strong>${selfStatDesemp.answered?selfStatDesemp.avg.toFixed(1):'—'}/4</strong> · Status: <strong>${draft.statusCarreira||'—'}</strong></div></div>
+      <div>Gestão: <strong>${mgrStatDesemp.answered?mgrStatDesemp.avg.toFixed(1):'—'}/4</strong> · Autoanálise: <strong>${selfStatDesemp.answered?selfStatDesemp.avg.toFixed(1):'—'}/4</strong> · Status: <strong>${draft.statusCarreira||'—'}</strong></div></div>
       <div class="rp-section-title">Pontos comportamentais</div>
       <table class="rp-compare-table"><thead><tr><th>Ponto comportamental</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${critRows}</tbody></table>
-      <div class="rp-section-title">Mandala de Competências (escala anterior)</div>${mandalaHtml}
-      <div class="rp-section-title">Comparativo por competência (escala anterior)</div>
-      <table class="rp-compare-table"><thead><tr><th>Competência</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${compareRows}</tbody></table>
-      <div class="rp-section-title">Nova Mandala de Competências (Desempenho)</div>${mandalaHtmlDesemp}
-      <div class="rp-section-title">Comparativo por competência (Nova Mandala)</div>
+      <div class="rp-section-title">Mandala de Competências</div>${mandalaHtmlDesemp}
+      <div class="rp-section-title">Comparativo por competência</div>
       <table class="rp-compare-table"><thead><tr><th>Competência</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${compareRowsDesemp}</tbody></table>
       <div class="rp-section-title">Acionamentos e visitas — histórico mensal</div>
       <table class="rp-compare-table"><thead><tr><th>Mês</th><th>Qtd. acionamentos</th><th>Qtd. visitas</th></tr></thead><tbody>${acRows}</tbody></table>
@@ -2238,13 +2186,13 @@ function renderQuadroGerencial(){
   main.innerHTML = `
     <div class="quadrant-wrap">
       <h2>Quadro Gerencial</h2>
-      <p>Visão executiva consolidada da equipe: distribuição na Matriz de Enquadramento e comparativo de competências da Mandala, com base nas avaliações da gestão.</p>
+      <p>Visão executiva consolidada da equipe: distribuição na Matriz de Enquadramento e comparativo de competências da Nova Mandala, com base nas avaliações da gestão.</p>
       <section class="block"><div class="block-head"><h3>Matriz de Enquadramento</h3></div>
         <div class="block-sub">Classificação da equipe nos Quadrantes 1, 2 e 3, com base na predominância dos pontos comportamentais avaliados pela gestão.</div>
         <div class="block-body" id="matrizBody"></div></section>
-      <section class="block"><div class="block-head" style="flex-wrap:wrap; gap:10px;"><h3>Competências da Mandala</h3>
+      <section class="block"><div class="block-head" style="flex-wrap:wrap; gap:10px;"><h3>Nova Mandala de Competências</h3>
         <select id="execFilterSelect" style="width:auto; min-width:220px;"><option value="">Todos (comparativo)</option>${teamData.map(t=>`<option value="${t.executive.id}">${t.executive.nome}</option>`).join('')}</select></div>
-        <div class="block-sub">Notas atribuídas pela gestão, com médias, rankings e comparação entre executivos.</div>
+        <div class="block-sub">Notas atribuídas pela gestão na nova escala (1-4), com médias, rankings e comparação entre executivos.</div>
         <div class="block-body" id="competBody"></div></section>
     </div>`;
   renderMatriz(document.getElementById('matrizBody'));
@@ -2281,12 +2229,12 @@ function renderMatriz(container){
 }
 
 function computeTeamCompetStats(){
-  const perExec = teamData.map(t=>{ const m=latestManager(t); const scores={}; if(m) m.manager_assessment_competencias.forEach(c=>scores[c.competencia]=c.nota); return {t, scores}; });
-  const teamStats = COMPETENCIAS.map(c=>{
+  const perExec = teamData.map(t=>{ const m=latestManager(t); const scores={}; if(m) (m.manager_assessment_desempenho||[]).forEach(c=>scores[c.comportamento]=c.nota); return {t, scores}; });
+  const teamStats = DESEMPENHO.map(c=>{
     const vals = perExec.map(p=>p.scores[c[0]]).filter(v=>v!==null && v!==undefined);
     const avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
     let tier = 'sem-dados';
-    if(avg!==null){ tier = avg>=2.4 ? 'forte' : (avg>=1.7 ? 'atencao' : 'critica'); }
+    if(avg!==null){ tier = avg>=3.2 ? 'forte' : (avg>=2.3 ? 'atencao' : 'critica'); }
     return { nome:c[0], avg, answered:vals.length, tier };
   });
   return { perExec, teamStats };
@@ -2304,13 +2252,13 @@ function renderCompetMandala(filterId){
   const topStrong = ranked.slice(0,5), topDevelop = ranked.slice().reverse().slice(0,5);
   const criticas = teamStats.filter(c=>c.tier==='critica');
   const rankingHtml = `<div class="insight-cols" style="margin-top:16px;">
-    <div class="insight-box"><h4>Ranking — mais fortes da equipe</h4>${topStrong.length?`<ul>${topStrong.map(c=>`<li>${c.nome} — <strong>${c.avg.toFixed(1)}/3</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Sem notas suficientes ainda.</div>'}</div>
-    <div class="insight-box"><h4>Ranking — maior necessidade de desenvolvimento</h4>${topDevelop.length?`<ul>${topDevelop.map(c=>`<li>${c.nome} — <strong>${c.avg.toFixed(1)}/3</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Sem notas suficientes ainda.</div>'}</div></div>
-    <div class="insight-box" style="margin-top:14px;"><h4>Competências críticas (média abaixo de 1,7)</h4>${criticas.length?`<ul>${criticas.map(c=>`<li>${c.nome} — <strong>${c.avg!==null?c.avg.toFixed(1):'—'}/3</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência em nível crítico no momento.</div>'}</div>`;
+    <div class="insight-box"><h4>Ranking — mais fortes da equipe</h4>${topStrong.length?`<ul>${topStrong.map(c=>`<li>${c.nome} — <strong>${c.avg.toFixed(1)}/4</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Sem notas suficientes ainda.</div>'}</div>
+    <div class="insight-box"><h4>Ranking — maior necessidade de desenvolvimento</h4>${topDevelop.length?`<ul>${topDevelop.map(c=>`<li>${c.nome} — <strong>${c.avg.toFixed(1)}/4</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Sem notas suficientes ainda.</div>'}</div></div>
+    <div class="insight-box" style="margin-top:14px;"><h4>Competências críticas (média abaixo de 2,3)</h4>${criticas.length?`<ul>${criticas.map(c=>`<li>${c.nome} — <strong>${c.avg!==null?c.avg.toFixed(1):'—'}/4</strong></li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência em nível crítico no momento.</div>'}</div>`;
 
   if(!filterId){
     let table = `<div style="overflow-x:auto;"><table class="rp-compare-table heatmap-table"><thead><tr><th class="heatmap-sticky">Competência</th>${perExec.map(p=>`<th>${p.t.executive.nome.split(' ')[0]}</th>`).join('')}<th>Média equipe</th></tr></thead><tbody>`;
-    COMPETENCIAS.forEach(c=>{
+    DESEMPENHO.forEach(c=>{
       const stat = teamStats.find(t=>t.nome===c[0]);
       table += `<tr><td class="heatmap-sticky" style="font-weight:600;">${c[0]}</td>`;
       perExec.forEach(p=>{ const s=p.scores[c[0]]; table += `<td style="text-align:center;">${s?`<span class="stat-badge s${s}">${s}</span>`:'<span class="stat-badge na">—</span>'}</td>`; });
@@ -2322,8 +2270,8 @@ function renderCompetMandala(filterId){
   }
   const t = teamData.find(x=>x.executive.id===filterId);
   const m = latestManager(t);
-  const scores = {}; if(m) m.manager_assessment_competencias.forEach(c=>scores[c.competencia]=c.nota);
-  const rows = COMPETENCIAS.map(c=>{
+  const scores = {}; if(m) (m.manager_assessment_desempenho||[]).forEach(c=>scores[c.comportamento]=c.nota);
+  const rows = DESEMPENHO.map(c=>{
     const s = scores[c[0]]; const stat = teamStats.find(x=>x.nome===c[0]);
     const diff = (s!=null && stat.avg!==null) ? (s-stat.avg) : null;
     return `<tr><td>${c[0]}</td><td style="text-align:center;">${s?`<span class="stat-badge s${s}">${s}</span>`:'<span class="stat-badge na">—</span>'}</td><td style="text-align:center;">${stat.avg!==null?stat.avg.toFixed(1):'—'}</td><td style="text-align:center;">${diff!==null?((diff>0?'+':'')+diff.toFixed(1)):'—'}</td><td style="text-align:center;">${tierBadge(stat.tier)}</td></tr>`;
