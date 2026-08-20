@@ -221,7 +221,7 @@ section.block{ margin-bottom:24px; border-radius:12px; border:1px solid var(--li
 .stat-line{ display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0; border-bottom:1px dashed var(--line); }
 .stat-line:last-child{ border-bottom:none; }
 .stat-badge{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:700; padding:2px 10px; border-radius:999px; color:#fff; font-size:10.5px; white-space:nowrap; }
-.stat-badge.s1{ background:var(--amber); } .stat-badge.s2{ background:var(--slate); } .stat-badge.s3{ background:var(--sage); } .stat-badge.na{ background:#C9D6DF; }
+.stat-badge.s1{ background:var(--amber); } .stat-badge.s2{ background:var(--slate); } .stat-badge.s3{ background:var(--sage); } .stat-badge.s4{ background:var(--lilac); } .stat-badge.na{ background:#C9D6DF; }
 .insight-cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
 .insight-box{ border:1px solid var(--line); border-radius:10px; padding:11px 13px; background:#FEFDFB; }
 .insight-box h4{ margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
@@ -307,7 +307,7 @@ table.rp-compare-table th{ background:#F0F5F9; font-weight:600; }
 .rp-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:#5B7285; }
 .rp-section-title{ font-family:'Manrope',sans-serif; font-size:14.5px; font-weight:600; margin:20px 0 8px; border-bottom:1px solid #ddd; padding-bottom:4px; color:var(--pine-dark); }
 .rp-pill{ display:inline-block; padding:2px 9px; border-radius:999px; color:#fff; font-size:10.5px; font-weight:600; }
-.rp-pill.s1, .rp-pill.l1{ background:var(--amber); } .rp-pill.s2, .rp-pill.l2{ background:var(--slate); } .rp-pill.s3, .rp-pill.l3{ background:var(--sage); } .rp-pill.empty{ background:#D9D3C4; color:#6b6b6b; }
+.rp-pill.s1, .rp-pill.l1{ background:var(--amber); } .rp-pill.s2, .rp-pill.l2{ background:var(--slate); } .rp-pill.s3, .rp-pill.l3{ background:var(--sage); } .rp-pill.s4{ background:var(--lilac); } .rp-pill.empty{ background:#D9D3C4; color:#6b6b6b; }
 .rp-list{ margin:0 0 4px; padding-left:18px; }
 .rp-list li{ margin-bottom:5px; }
 .rp-empty{ color:#777; font-style:italic; margin:0; }
@@ -1019,7 +1019,7 @@ async function loadTeam(silent){
     .select('*, self_assessment_pontos(*), self_assessment_competencias(*), self_assessment_desempenho(*)')
     .order('data_preenchimento', { ascending:true });
   const { data: managerAssessments } = await sb.from('manager_assessments')
-    .select('*, manager_assessment_pontos(*), manager_assessment_competencias(*), manager_acionamentos(*), manager_consumo(*), manager_positives(*), manager_develop(*), manager_next_steps(*)')
+    .select('*, manager_assessment_pontos(*), manager_assessment_competencias(*), manager_assessment_desempenho(*), manager_acionamentos(*), manager_consumo(*), manager_positives(*), manager_develop(*), manager_next_steps(*)')
     .order('data_avaliacao', { ascending:true });
   // histórico mensal contínuo (independente de ciclo) — tabelas novas, aditivas;
   // se a migração ainda não foi rodada, o select falha silenciosamente e cai em [].
@@ -1162,13 +1162,12 @@ function renderTimeline(){
 }
 
 function emptyDraft(){
-  const picks={}, scores={};
+  const picks={}, scores={}, desempenho={};
   CRITERIA.forEach(c=>picks[c[0]]=null);
   COMPETENCIAS.forEach(c=>scores[c[0]]=null);
+  DESEMPENHO.forEach(c=>desempenho[c[0]]=null);
   return {
-    picks, scores,
-    acionamentos: [1,2,3].map(()=>({mes:'',quantidade:'',visitas:'',observacoes:''})),
-    consumo: [1,2,3].map(()=>({mes:'',quantidade:'',observacoes:''})),
+    picks, scores, desempenho,
     positives: [], develop: [], nextSteps: [],
     statusCarreira:'', recomendacao:'', dataFeedback:'', concluido:false,
     maId: null
@@ -1205,18 +1204,7 @@ function draftFromManager(ma){
   if(!ma) return d;
   ma.manager_assessment_pontos.forEach(p=>d.picks[p.ponto]=p.quadrante);
   ma.manager_assessment_competencias.forEach(c=>d.scores[c.competencia]=c.nota);
-  if(ma.manager_acionamentos && ma.manager_acionamentos.length){
-    d.acionamentos = [1,2,3].map(i=>{
-      const r = ma.manager_acionamentos.find(x=>x.mes_index===i);
-      return r ? {mes:r.mes||'',quantidade:r.quantidade??'',visitas:r.visitas??'',observacoes:r.observacoes||''} : {mes:'',quantidade:'',visitas:'',observacoes:''};
-    });
-  }
-  if(ma.manager_consumo && ma.manager_consumo.length){
-    d.consumo = [1,2,3].map(i=>{
-      const r = ma.manager_consumo.find(x=>x.mes_index===i);
-      return r ? {mes:r.mes||'',quantidade:r.quantidade??'',observacoes:r.observacoes||''} : {mes:'',quantidade:'',observacoes:''};
-    });
-  }
+  (ma.manager_assessment_desempenho||[]).forEach(c=>d.desempenho[c.comportamento]=c.nota);
   d.positives = (ma.manager_positives||[]).sort((a,b)=>a.ordem-b.ordem).map(p=>({texto:p.texto}));
   d.develop = (ma.manager_develop||[]).sort((a,b)=>a.ordem-b.ordem).map(p=>({texto:p.texto}));
   d.nextSteps = (ma.manager_next_steps||[]).sort((a,b)=>a.ordem-b.ordem).map(p=>({acao:p.acao||'',prazo:p.prazo||'',acompanhamento:p.acompanhamento||''}));
@@ -1314,27 +1302,22 @@ function renderPersonForm(){
     </section>
 
     <section class="block manager">
-      <div class="block-head"><h3>④ Feedback Geral — avaliação da gestão</h3></div>
-      <div class="block-sub">As notas atribuídas aqui geram a Mandala de Competências oficial e definem o posicionamento do(a) colaborador(a).</div>
+      <div class="block-head"><h3>④ Feedback Geral — avaliação da gestão (escala anterior)</h3></div>
+      <div class="block-sub">As notas atribuídas aqui geram a Mandala de Competências oficial (escala 1-3) e definem o posicionamento do(a) colaborador(a).</div>
       <div class="block-body" id="managerScoreBody"></div>
       <div style="padding:0 18px 18px;" id="mandalaPanel"></div>
     </section>
 
-    <section class="block acionamentos">
-      <div class="block-head"><h3>⑤ Registro de acionamentos</h3></div>
-      <div class="block-sub">Histórico dos últimos 3 meses (por ciclo).</div>
-      <div class="block-body" id="acionamentosBody"></div>
-    </section>
-
-    <section class="block consumo">
-      <div class="block-head"><h3>⑥ Consumo estratégico</h3></div>
-      <div class="block-sub">Ações de consumo estratégico desenvolvidas nos últimos 3 meses (por ciclo).</div>
-      <div class="block-body" id="consumoBody"></div>
+    <section class="block manager">
+      <div class="block-head"><h3>④b Feedback Geral — avaliação da gestão (Nova Mandala de Competências)</h3></div>
+      <div class="block-sub">Sua avaliação na nova escala (1 a 4), ao lado da avaliação na escala anterior — nenhuma substitui a outra.</div>
+      <div class="block-body" id="managerDesempenhoBody"></div>
+      <div style="padding:0 18px 18px;" id="mandalaPanelDesempenho"></div>
     </section>
 
     <section class="block acionamentos">
-      <div class="block-head"><h3>⑤b Acionamentos e visitas — histórico mensal</h3></div>
-      <div class="block-sub">Linha do tempo contínua por mês/ano, independente do ciclo — alimentada pela planilha real importada em "Importar dados" ou editável diretamente aqui. Nada aqui substitui os registros por ciclo acima.</div>
+      <div class="block-head"><h3>⑤ Acionamentos e visitas — histórico mensal</h3></div>
+      <div class="block-sub">Linha do tempo contínua por mês/ano — alimentada pela planilha real importada em "Importar dados" ou editável diretamente aqui.</div>
       <div class="block-body" id="mensalAcionamentosBody"></div>
       <div style="padding:0 18px 18px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" id="btnAddMesAcionamentos" type="button">+ adicionar mês</button>
@@ -1343,8 +1326,8 @@ function renderPersonForm(){
     </section>
 
     <section class="block consumo">
-      <div class="block-head"><h3>⑥b Consumo estratégico — histórico mensal</h3></div>
-      <div class="block-sub">Linha do tempo contínua por mês/ano, independente do ciclo — alimentada pela planilha real importada em "Importar dados" ou editável diretamente aqui.</div>
+      <div class="block-head"><h3>⑥ Consumo estratégico — histórico mensal</h3></div>
+      <div class="block-sub">Linha do tempo contínua por mês/ano — alimentada pela planilha real importada em "Importar dados" ou editável diretamente aqui.</div>
       <div class="block-body" id="mensalConsumoBody"></div>
       <div style="padding:0 18px 18px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" id="btnAddMesConsumo" type="button">+ adicionar mês</button>
@@ -1420,8 +1403,7 @@ function renderPersonForm(){
   renderSelfDesempenhoEditable();
   renderManagerScoreEditable();
   renderMandalaPanel();
-  renderMonthBlock('acionamentos','acionamentosBody', ['mes','quantidade','visitas','observacoes'], true);
-  renderMonthBlock('consumo','consumoBody', ['mes','quantidade','observacoes'], false);
+  renderManagerDesempenhoEditable();
   renderMensalSections();
   renderAspirationReference();
   renderOpenList('positives','positivesBody','PONTO','Ex: qualidade das entregas, proatividade...');
@@ -1605,44 +1587,49 @@ function renderMandalaPanel(){
   `;
 }
 
-// ⑤⑥ tabelas mensais
-const MONTH_CHART_CFG = {
-  acionamentos: [ {key:'quantidade', label:'Acionamentos por mês', color:'var(--clay)'}, {key:'visitas', label:'Visitas por mês', color:'var(--teal)'} ],
-  consumo: [ {key:'quantidade', label:'Ações de consumo estratégico por mês', color:'var(--teal)'} ]
-};
-function renderMonthBlock(field, bodyId, keys, wide4){
-  const body = document.getElementById(bodyId);
-  const rows = draft[field].map((row,i)=>{
-    const cells = keys.map(k=>{
-      const val = row[k] ?? '';
-      const label = k==='mes' ? `Mês ${i+1}` : (k==='quantidade' && field==='acionamentos' ? 'Qtd. acionamentos' : k==='quantidade' ? 'Qtd. ações' : k==='visitas' ? 'Qtd. visitas' : 'Observações');
-      const type = (k==='quantidade'||k==='visitas') ? 'number' : 'text';
-      const placeholder = k==='mes' ? 'Ex: Maio/2026' : (k==='observacoes' ? 'Contexto do mês' : '');
-      return `<div class="field"><label>${label}</label><input type="${type}" ${type==='number'?'min="0"':''} data-mk="${field}:${i}:${k}" value="${escapeAttr(val)}" placeholder="${placeholder}"></div>`;
-    }).join('');
-    return `<div class="month-row ${wide4?'wide4':''}">${cells}</div>`;
+// ④b avaliação da gestão na NOVA Mandala (Desempenho, escala 1-4) — editável, ao lado de ④ (escala antiga)
+function renderManagerDesempenhoEditable(){
+  const body = document.getElementById('managerDesempenhoBody');
+  body.innerHTML = DESEMPENHO.map(c=>{
+    const nome=c[0], desc=c[1];
+    return `<div class="comp-row"><div class="comp-info"><span class="comp-name">${nome}</span><span class="comp-desc">${desc}</span></div>
+      <div class="score-buttons" data-comp="${escapeAttr(nome)}">${[1,2,3,4].map(n=>`<button type="button" class="score-btn ${draft.desempenho[nome]===n?'active':''}" data-score="${n}" title="${escapeAttr(DESEMPENHO_LEVELS[n].label+' — '+DESEMPENHO_LEVELS[n].desc)}"><span class="num">${n}</span><span class="cap">${DESEMPENHO_LEVELS[n].label}</span></button>`).join('')}</div></div>`;
   }).join('');
-
-  let charts = '';
-  (MONTH_CHART_CFG[field]||[]).forEach(ch=>{
-    const vals = draft[field].map(r=>parseFloat(r[ch.key])||0);
-    const maxV = Math.max(...vals,1);
-    if(vals.some(v=>v>0)){
-      charts += `<div class="chart-label mono">${ch.label}</div><div class="bar-chart">${draft[field].map((r,i)=>{
-        const v = parseFloat(r[ch.key])||0; const h = Math.round((v/maxV)*70)+4;
-        return `<div class="bar-col"><span class="bar-val">${r[ch.key]||0}</span><div class="bar" style="height:${h}px; background:${ch.color};"></div><span class="bar-label">${escapeHtml(r.mes)||('Mês '+(i+1))}</span></div>`;
-      }).join('')}</div>`;
-    }
-  });
-
-  body.innerHTML = `<div class="entry">${rows}</div>${charts}`;
-  body.querySelectorAll('[data-mk]').forEach(inp=>{
-    inp.addEventListener('input', e=>{
-      const [f, idx, k] = e.target.dataset.mk.split(':');
-      draft[f][idx][k] = e.target.value;
-      renderMonthBlock(field, bodyId, keys, wide4);
+  body.querySelectorAll('.score-buttons').forEach(group=>{
+    const comp = group.dataset.comp;
+    group.querySelectorAll('.score-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const n = Number(btn.dataset.score);
+        draft.desempenho[comp] = draft.desempenho[comp]===n ? null : n;
+        group.querySelectorAll('.score-btn').forEach(b=>b.classList.toggle('active', Number(b.dataset.score)===draft.desempenho[comp]));
+        renderMandalaPanelDesempenho();
+      });
     });
   });
+  renderMandalaPanelDesempenho();
+}
+function renderMandalaPanelDesempenho(){
+  const el = document.getElementById('mandalaPanelDesempenho');
+  const mgrStat = desempenhoStats(draft.desempenho);
+  if(!mgrStat.answered){ el.innerHTML = '<div class="insight-empty" style="padding:8px 0;">Preencha as notas da nova avaliação da gestão acima para gerar a Mandala.</div>'; return; }
+  const sortedByScore = DESEMPENHO.map(c=>({name:c[0], score:draft.desempenho[c[0]]})).filter(c=>c.score!==null);
+  const maxScore = sortedByScore.length ? Math.max(...sortedByScore.map(c=>c.score)) : null;
+  const minScore = sortedByScore.length ? Math.min(...sortedByScore.map(c=>c.score)) : null;
+  const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=3);
+  const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
+  el.innerHTML = `
+    <div class="mandala-sub-title">Nova Mandala de Competências (Desempenho)</div>
+    <div class="stats-col">
+      <div class="stat-line"><span>Média geral</span><strong>${mgrStat.avg.toFixed(1)} / 4</strong></div>
+      <div class="stat-line"><span>Competências avaliadas</span><strong>${mgrStat.answered}/${mgrStat.total}</strong></div>
+      ${DESEMPENHO.map(c=>{ const s=draft.desempenho[c[0]]; return `<div class="stat-line"><span>${c[0]}</span><span class="stat-badge ${s?'s'+s:'na'}">${s?DESEMPENHO_LEVELS[s].label:'—'}</span></div>`; }).join('')}
+    </div>
+    <div class="insight-cols">
+      <div class="insight-box"><h4>Principais pontos fortes</h4>${strengths.length?`<ul>${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência com nota de destaque ainda.</div>'}</div>
+      <div class="insight-box"><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul>${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência crítica identificada ainda.</div>'}</div>
+    </div>
+    <div class="insight-box" style="margin-top:14px;"><h4>Prioridades para o PDI</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>Desenvolver <strong>${s.name}</strong> por meio de ações direcionadas, feedback contínuo e acompanhamento no próximo ciclo.</li>`).join('')}</ul>`:'<div class="insight-empty">Defina notas mais baixas em ao menos uma competência para gerar prioridades de PDI.</div>'}</div>
+  `;
 }
 
 // ⑦ preenchida pelo(a) colaborador(a) — agora editável/corrigível pela gestora (grava em selfDraft)
@@ -1663,7 +1650,7 @@ function renderAspirationReference(){
   document.getElementById('selfAspProximo').addEventListener('change', e=>selfDraft.selfAspiracaoProximoCiclo=e.target.value);
 }
 
-/* ---- ⑤b/⑥b histórico mensal contínuo (acionamentos_mensal / consumo_mensal) ---- */
+/* ---- ⑤⑥ histórico mensal contínuo (acionamentos_mensal / consumo_mensal) ---- */
 function renderMensalTable(kind, bodyId){
   const body = document.getElementById(bodyId);
   const rows = mensalDraft[kind];
@@ -1852,7 +1839,7 @@ function renderMonthlyEvolutionChart(t){
       consumoData.push(c && c.quantidade!==null && c.quantidade!==undefined ? c.quantidade : null);
     }
   });
-  // histórico mensal contínuo (planilhas reais importadas / lançamentos diretos em ⑤b⑥b)
+  // histórico mensal contínuo (planilhas reais importadas / lançamentos diretos em ⑤⑥)
   const mensalKeys = new Set();
   (t.mensalAcionamentos||[]).forEach(m=>mensalKeys.add(m.ano+'-'+m.mes_index));
   (t.mensalConsumo||[]).forEach(m=>mensalKeys.add(m.ano+'-'+m.mes_index));
@@ -1916,8 +1903,7 @@ async function salvarAnalise(){
       await Promise.all([
         sb.from('manager_assessment_pontos').delete().eq('manager_assessment_id', maId),
         sb.from('manager_assessment_competencias').delete().eq('manager_assessment_id', maId),
-        sb.from('manager_acionamentos').delete().eq('manager_assessment_id', maId),
-        sb.from('manager_consumo').delete().eq('manager_assessment_id', maId),
+        sb.from('manager_assessment_desempenho').delete().eq('manager_assessment_id', maId),
         sb.from('manager_positives').delete().eq('manager_assessment_id', maId),
         sb.from('manager_develop').delete().eq('manager_assessment_id', maId),
         sb.from('manager_next_steps').delete().eq('manager_assessment_id', maId),
@@ -1930,8 +1916,7 @@ async function salvarAnalise(){
 
     const pontosRows = CRITERIA.filter(c=>draft.picks[c[0]]).map(c=>({manager_assessment_id:maId, ponto:c[0], quadrante:draft.picks[c[0]]}));
     const compRows = COMPETENCIAS.filter(c=>draft.scores[c[0]]).map(c=>({manager_assessment_id:maId, competencia:c[0], nota:draft.scores[c[0]]}));
-    const acRows = draft.acionamentos.map((r,i)=>({manager_assessment_id:maId, mes_index:i+1, mes:r.mes||null, quantidade:r.quantidade?Number(r.quantidade):null, visitas:r.visitas?Number(r.visitas):null, observacoes:r.observacoes||null}));
-    const csRows = draft.consumo.map((r,i)=>({manager_assessment_id:maId, mes_index:i+1, mes:r.mes||null, quantidade:r.quantidade?Number(r.quantidade):null, observacoes:r.observacoes||null}));
+    const desempRows = DESEMPENHO.filter(c=>draft.desempenho[c[0]]).map(c=>({manager_assessment_id:maId, comportamento:c[0], nota:draft.desempenho[c[0]]}));
     const posRows = draft.positives.filter(p=>p.texto.trim()).map((p,i)=>({manager_assessment_id:maId, texto:p.texto, ordem:i}));
     const devRows = draft.develop.filter(p=>p.texto.trim()).map((p,i)=>({manager_assessment_id:maId, texto:p.texto, ordem:i}));
     const nextRows = draft.nextSteps.filter(p=>p.acao.trim()||p.acompanhamento.trim()).map((p,i)=>({manager_assessment_id:maId, acao:p.acao||null, prazo:p.prazo||null, acompanhamento:p.acompanhamento||null, ordem:i}));
@@ -1939,8 +1924,7 @@ async function salvarAnalise(){
     await Promise.all([
       pontosRows.length ? sb.from('manager_assessment_pontos').insert(pontosRows) : Promise.resolve(),
       compRows.length ? sb.from('manager_assessment_competencias').insert(compRows) : Promise.resolve(),
-      sb.from('manager_acionamentos').insert(acRows),
-      sb.from('manager_consumo').insert(csRows),
+      desempRows.length ? sb.from('manager_assessment_desempenho').insert(desempRows) : Promise.resolve(),
       posRows.length ? sb.from('manager_positives').insert(posRows) : Promise.resolve(),
       devRows.length ? sb.from('manager_develop').insert(devRows) : Promise.resolve(),
       nextRows.length ? sb.from('manager_next_steps').insert(nextRows) : Promise.resolve(),
@@ -2002,15 +1986,20 @@ function printPersonReport(){
   const ex = activeExec.executive;
   const selfPicks = {}; if(activeSelf) activeSelf.self_assessment_pontos.forEach(p=>selfPicks[p.ponto]=p.quadrante);
   const selfScores = {}; if(activeSelf) activeSelf.self_assessment_competencias.forEach(c=>selfScores[c.competencia]=c.nota);
+  const selfDesemp = {}; if(activeSelf) (activeSelf.self_assessment_desempenho||[]).forEach(c=>selfDesemp[c.comportamento]=c.nota);
   const mgrStat = scoreStats(draft.scores);
   const selfStat = scoreStats(selfScores);
+  const mgrStatDesemp = desempenhoStats(draft.desempenho);
+  const selfStatDesemp = desempenhoStats(selfDesemp);
 
   const pill = (s)=> s ? `<span class="rp-pill s${s}">${s}</span>` : `<span class="rp-pill empty">—</span>`;
+  const pillDesemp = (s)=> s ? `<span class="rp-pill s${s}">${DESEMPENHO_LEVELS[s].label}</span>` : `<span class="rp-pill empty">—</span>`;
   const compareRows = COMPETENCIAS.map(c=>`<tr><td>${c[0]}</td><td>${pill(selfScores[c[0]])}</td><td>${pill(draft.scores[c[0]])}</td></tr>`).join('');
+  const compareRowsDesemp = DESEMPENHO.map(c=>`<tr><td>${c[0]}</td><td>${pillDesemp(selfDesemp[c[0]])}</td><td>${pillDesemp(draft.desempenho[c[0]])}</td></tr>`).join('');
   const critPill = (lvl)=> lvl ? `<span class="rp-pill l${lvl}">${LEVEL_LABELS[lvl]}</span>` : `<span class="rp-pill empty">—</span>`;
   const critRows = CRITERIA.map(c=>`<tr><td>${c[0]}</td><td>${critPill(selfPicks[c[0]])}</td><td>${critPill(draft.picks[c[0]])}</td></tr>`).join('');
 
-  let mandalaHtml = '<p class="rp-empty">Avaliação da gestão ainda não preenchida.</p>';
+  let mandalaHtml = '<p class="rp-empty">Avaliação da gestão ainda não preenchida (escala anterior).</p>';
   if(mgrStat.answered){
     const svg = buildRadarSVG(draft.scores, selfScores);
     const sortedByScore = COMPETENCIAS.map(c=>({name:c[0], score:draft.scores[c[0]]})).filter(c=>c.score!==null);
@@ -2026,10 +2015,19 @@ function printPersonReport(){
       <div><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div></div>`;
   }
 
+  let mandalaHtmlDesemp = '<p class="rp-empty">Avaliação da gestão ainda não preenchida (nova mandala).</p>';
+  if(mgrStatDesemp.answered){
+    mandalaHtmlDesemp = `<div class="rp-mandala-stats"><div class="rp-stat-line"><span>Média geral</span><strong>${mgrStatDesemp.avg.toFixed(1)}/4</strong></div>
+      <div class="rp-stat-line"><span>Competências avaliadas</span><strong>${mgrStatDesemp.answered}/${mgrStatDesemp.total}</strong></div>
+      ${DESEMPENHO.map(c=>`<div class="rp-stat-line"><span>${c[0]}</span>${pillDesemp(draft.desempenho[c[0]])}</div>`).join('')}</div>`;
+  }
+
   const listOrEmpty = arr => arr.length ? `<ul class="rp-list">${arr.map(p=>`<li>${escapeHtml(p.texto)}</li>`).join('')}</ul>` : '<p class="rp-empty">Nenhum ponto registrado.</p>';
   const nextHtml = draft.nextSteps.length ? `<table class="rp-compare-table"><thead><tr><th>Ação</th><th>Prazo</th><th>Acompanhamento</th></tr></thead><tbody>${draft.nextSteps.map(n=>`<tr><td>${escapeHtml(n.acao)}</td><td>${n.prazo?formatDateBR(n.prazo):'-'}</td><td>${escapeHtml(n.acompanhamento)}</td></tr>`).join('')}</tbody></table>` : '<p class="rp-empty">Nenhum próximo passo registrado.</p>';
-  const acRows = draft.acionamentos.map(r=>`<tr><td>${escapeHtml(r.mes)||'-'}</td><td>${r.quantidade||'-'}</td><td>${r.visitas||'-'}</td><td>${escapeHtml(r.observacoes)||'-'}</td></tr>`).join('');
-  const csRows = draft.consumo.map(r=>`<tr><td>${escapeHtml(r.mes)||'-'}</td><td>${r.quantidade||'-'}</td><td>${escapeHtml(r.observacoes)||'-'}</td></tr>`).join('');
+  const mensalAc = (activeExec.mensalAcionamentos||[]).slice().sort((a,b)=>(a.ano-b.ano)||(a.mes_index-b.mes_index));
+  const mensalCs = (activeExec.mensalConsumo||[]).slice().sort((a,b)=>(a.ano-b.ano)||(a.mes_index-b.mes_index));
+  const acRows = mensalAc.length ? mensalAc.map(r=>`<tr><td>${MES_LABEL_BY_INDEX[r.mes_index]||r.mes_index}/${r.ano}</td><td>${r.quantidade??'-'}</td><td>${r.visitas??'-'}</td></tr>`).join('') : '<tr><td colspan="3" class="rp-empty">Sem dados lançados.</td></tr>';
+  const csRows = mensalCs.length ? mensalCs.map(r=>`<tr><td>${MES_LABEL_BY_INDEX[r.mes_index]||r.mes_index}/${r.ano}</td><td>${r.quantidade??'-'}</td><td>${escapeHtml(r.observacoes)||'-'}</td></tr>`).join('') : '<tr><td colspan="3" class="rp-empty">Sem dados lançados.</td></tr>';
   const asp = activeSelf ? `<p><strong>Aonde quer chegar:</strong> ${escapeHtml(activeSelf.aspiracao_objetivo)||'—'}<br><strong>Prazo desejado:</strong> ${activeSelf.aspiracao_prazo||'—'}<br><strong>Próximo ciclo:</strong> ${activeSelf.aspiracao_proximo_ciclo||'—'}</p>` : '<p class="rp-empty">Não preenchida.</p>';
 
   document.getElementById('printArea').innerHTML = `
@@ -2037,16 +2035,19 @@ function printPersonReport(){
       <div class="rp-header"><div><h1>${ex.nome}</h1><div class="rp-meta">${ex.cargo_atual||''} · Ciclo ${activeSelf?activeSelf.ciclo:'—'}</div></div>
       <div class="rp-meta" style="text-align:right;">Relatório de Evolução<br>Gerado em ${new Date().toLocaleDateString('pt-BR')}</div></div>
       <div class="rp-official-box"><div class="rp-label">Resumo</div>
-      <div>Média geral da gestão: <strong>${mgrStat.answered?mgrStat.avg.toFixed(1):'—'}/3</strong> · Autoanálise: <strong>${selfStat.answered?selfStat.avg.toFixed(1):'—'}/3</strong> · Status: <strong>${draft.statusCarreira||'—'}</strong></div></div>
+      <div>Gestão (escala anterior): <strong>${mgrStat.answered?mgrStat.avg.toFixed(1):'—'}/3</strong> · Autoanálise: <strong>${selfStat.answered?selfStat.avg.toFixed(1):'—'}/3</strong> · Gestão (nova mandala): <strong>${mgrStatDesemp.answered?mgrStatDesemp.avg.toFixed(1):'—'}/4</strong> · Autoanálise (nova mandala): <strong>${selfStatDesemp.answered?selfStatDesemp.avg.toFixed(1):'—'}/4</strong> · Status: <strong>${draft.statusCarreira||'—'}</strong></div></div>
       <div class="rp-section-title">Pontos comportamentais</div>
       <table class="rp-compare-table"><thead><tr><th>Ponto comportamental</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${critRows}</tbody></table>
-      <div class="rp-section-title">Mandala de Competências</div>${mandalaHtml}
-      <div class="rp-section-title">Comparativo por competência</div>
+      <div class="rp-section-title">Mandala de Competências (escala anterior)</div>${mandalaHtml}
+      <div class="rp-section-title">Comparativo por competência (escala anterior)</div>
       <table class="rp-compare-table"><thead><tr><th>Competência</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${compareRows}</tbody></table>
-      <div class="rp-section-title">Registro de acionamentos</div>
-      <table class="rp-compare-table"><thead><tr><th>Mês</th><th>Qtd. acionamentos</th><th>Qtd. visitas</th><th>Observações</th></tr></thead><tbody>${acRows}</tbody></table>
-      <div class="rp-section-title">Consumo estratégico</div>
-      <table class="rp-compare-table"><thead><tr><th>Mês</th><th>Qtd. ações</th><th>Observações</th></tr></thead><tbody>${csRows}</tbody></table>
+      <div class="rp-section-title">Nova Mandala de Competências (Desempenho)</div>${mandalaHtmlDesemp}
+      <div class="rp-section-title">Comparativo por competência (Nova Mandala)</div>
+      <table class="rp-compare-table"><thead><tr><th>Competência</th><th>Autoanálise</th><th>Gestão</th></tr></thead><tbody>${compareRowsDesemp}</tbody></table>
+      <div class="rp-section-title">Acionamentos e visitas — histórico mensal</div>
+      <table class="rp-compare-table"><thead><tr><th>Mês</th><th>Qtd. acionamentos</th><th>Qtd. visitas</th></tr></thead><tbody>${acRows}</tbody></table>
+      <div class="rp-section-title">Consumo estratégico — histórico mensal</div>
+      <table class="rp-compare-table"><thead><tr><th>Mês</th><th>Qtd./Análise geral</th><th>Observações</th></tr></thead><tbody>${csRows}</tbody></table>
       <div class="rp-section-title">Projeção profissional</div>${asp}
       <div class="rp-section-title">Pontos positivos</div>${listOrEmpty(draft.positives)}
       <div class="rp-section-title">Pontos a desenvolver</div>${listOrEmpty(draft.develop)}
@@ -2069,52 +2070,15 @@ function findExecutiveByName(nome){
   t = teamData.find(x=>normalizeName(x.executive.nome).includes(n) || n.includes(normalizeName(x.executive.nome)));
   return t || null;
 }
-function defaultCiclo(){
-  const d = new Date();
-  const q = Math.floor(d.getMonth()/3)+1;
-  return d.getFullYear()+'-Q'+q;
-}
-async function findOrCreateManagerAssessment(t, ciclo){
-  let ma = t.managerAssessments.find(m=>m.ciclo===ciclo);
-  if(ma) return ma.id;
-  const self = t.assessments.find(a=>a.ciclo===ciclo) || latestSelf(t);
-  const payload = {
-    executive_id: t.executive.id,
-    self_assessment_id: self ? self.id : null,
-    ciclo,
-    data_avaliacao: new Date().toISOString().slice(0,10),
-    concluido: false
-  };
-  const { data, error } = await sb.from('manager_assessments').insert(payload).select('id').single();
-  if(error || !data) throw new Error((error && error.message) || 'Falha ao criar registro para ' + t.executive.nome);
-  // mantém teamData coerente para as próximas linhas da mesma planilha
-  t.managerAssessments.push(Object.assign({ id:data.id, manager_assessment_pontos:[], manager_assessment_competencias:[], manager_acionamentos:[], manager_consumo:[], manager_positives:[], manager_develop:[], manager_next_steps:[] }, payload));
-  return data.id;
-}
-
-function downloadCsv(filename, rows){
-  const csv = rows.map(r=>r.map(v=>{
-    v = (v===null||v===undefined) ? '' : String(v);
-    return /[",;\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
-  }).join(';')).join('\r\n');
-  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
 function renderImportador(){
   const main = document.getElementById('main');
   main.innerHTML = `
     <div class="quadrant-wrap">
       <h2>Importar dados em lote</h2>
-      <p>Suba uma planilha para lançar de uma vez os dados de vários executivos, em vez de preencher pessoa por pessoa. Nenhuma importação apaga registros de ciclos anteriores — os dados entram como histórico mensal contínuo (seções ⑤b/⑥b de cada pessoa), somando-se ao que já existe.</p>
+      <p>Suba diretamente o arquivo exportado, sem precisar reformatar nada — por exemplo o "Acompanhamento de Acionamentos e Visitas" ou o "PLR / Consumo Estratégico". O painel identifica sozinho o tipo de planilha pelas abas/colunas: <span class="mono">Base Acionamentos</span> e/ou <span class="mono">Base Visitas</span> (acionamentos e visitas semanais/mensais) ou <span class="mono">Base</span> com a coluna <span class="mono">Prioridade 1</span> (export de consumo estratégico do Power BI). Como essas planilhas não trazem o ano, informe-o abaixo. Os indicadores entram direto no histórico mensal (seções ⑤/⑥ de cada pessoa) — nenhuma importação apaga registros já existentes.</p>
 
       <section class="gcard">
-        <h2>① Importar planilha real — identificação automática de formato</h2>
-        <div class="sub">Suba diretamente o arquivo exportado, sem precisar reformatar nada — por exemplo o "Acompanhamento de Acionamentos e Visitas" ou o "PLR / Consumo Estratégico". O painel identifica sozinho o tipo de planilha pelas abas/colunas: <span class="mono">Base Acionamentos</span> e/ou <span class="mono">Base Visitas</span> (acionamentos e visitas semanais/mensais) ou <span class="mono">Base</span> com a coluna <span class="mono">Prioridade 1</span> (export de consumo estratégico do Power BI). Como essas planilhas não trazem o ano, informe-o abaixo.</div>
+        <h2>Importar planilha real — identificação automática de formato</h2>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin:10px 0;">
           <div class="field" style="max-width:110px;"><label>Ano de referência</label><input type="number" id="anoImportReal" value="${new Date().getFullYear()}" min="2020" max="2100"></div>
           <input type="file" id="fileReal" accept=".xlsx,.xls,.csv">
@@ -2122,115 +2086,9 @@ function renderImportador(){
         </div>
         <div id="msgReal"></div>
       </section>
-
-      <section class="gcard">
-        <h2>② Registro de acionamentos (modelo simplificado, por ciclo)</h2>
-        <div class="sub">Colunas esperadas: <span class="mono">Executivo, Ciclo, Mes1, Qtd1, Visitas1, Obs1, Mes2, Qtd2, Visitas2, Obs2, Mes3, Qtd3, Visitas3, Obs3</span>. "Ciclo" é opcional — se vazio, usa o ciclo da última autoanálise da pessoa (ou o ciclo atual).</div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0;">
-          <button class="btn btn-ghost btn-sm" id="btnModeloAcionamentos" type="button">Baixar modelo (.csv)</button>
-          <input type="file" id="fileAcionamentos" accept=".xlsx,.xls,.csv">
-          <button class="btn btn-primary btn-sm" id="btnImportarAcionamentos" type="button">Processar importação</button>
-        </div>
-        <div id="msgAcionamentos"></div>
-      </section>
-
-      <section class="gcard">
-        <h2>③ Consumo estratégico (modelo simplificado, por ciclo)</h2>
-        <div class="sub">Colunas esperadas: <span class="mono">Executivo, Ciclo, Mes1, Qtd1, Obs1, Mes2, Qtd2, Obs2, Mes3, Qtd3, Obs3</span>. "Ciclo" é opcional, mesma regra acima.</div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0;">
-          <button class="btn btn-ghost btn-sm" id="btnModeloConsumo" type="button">Baixar modelo (.csv)</button>
-          <input type="file" id="fileConsumo" accept=".xlsx,.xls,.csv">
-          <button class="btn btn-primary btn-sm" id="btnImportarConsumo" type="button">Processar importação</button>
-        </div>
-        <div id="msgConsumo"></div>
-      </section>
     </div>`;
 
-  document.getElementById('btnModeloAcionamentos').addEventListener('click', ()=>{
-    downloadCsv('modelo_acionamentos.csv', [
-      ['Executivo','Ciclo','Mes1','Qtd1','Visitas1','Obs1','Mes2','Qtd2','Visitas2','Obs2','Mes3','Qtd3','Visitas3','Obs3'],
-      teamData[0] ? [teamData[0].executive.nome,'2026-Q3','Julho','12','4','','Agosto','15','5','','Setembro','10','3',''] : ['Nome do executivo','2026-Q3','Julho','12','4','','Agosto','15','5','','Setembro','10','3','']
-    ]);
-  });
-  document.getElementById('btnModeloConsumo').addEventListener('click', ()=>{
-    downloadCsv('modelo_consumo.csv', [
-      ['Executivo','Ciclo','Mes1','Qtd1','Obs1','Mes2','Qtd2','Obs2','Mes3','Qtd3','Obs3'],
-      teamData[0] ? [teamData[0].executive.nome,'2026-Q3','Julho','120','','Agosto','135','','Setembro','128',''] : ['Nome do executivo','2026-Q3','Julho','120','','Agosto','135','','Setembro','128','']
-    ]);
-  });
-
-  document.getElementById('btnImportarAcionamentos').addEventListener('click', ()=>processImportFile('fileAcionamentos','msgAcionamentos','acionamentos'));
-  document.getElementById('btnImportarConsumo').addEventListener('click', ()=>processImportFile('fileConsumo','msgConsumo','consumo'));
   document.getElementById('btnImportarReal').addEventListener('click', ()=>processRealDataFile('fileReal','anoImportReal','msgReal'));
-}
-
-function readSheetRows(file){
-  return new Promise((resolve, reject)=>{
-    if(typeof XLSX === 'undefined'){ reject(new Error('Biblioteca de leitura de planilhas não carregou (verifique a conexão) — tente novamente.')); return; }
-    const reader = new FileReader();
-    reader.onload = (e)=>{
-      try{
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
-        resolve(rows);
-      }catch(err){ reject(err); }
-    };
-    reader.onerror = ()=>reject(new Error('Não foi possível ler o arquivo.'));
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-async function processImportFile(inputId, msgId, tipo){
-  const input = document.getElementById(inputId);
-  const msgEl = document.getElementById(msgId);
-  const file = input.files && input.files[0];
-  if(!file){ msgEl.innerHTML = '<div class="error-msg" style="display:block;">Selecione um arquivo primeiro.</div>'; return; }
-  msgEl.innerHTML = '<div class="sub">Processando...</div>';
-
-  let rows;
-  try{ rows = await readSheetRows(file); }
-  catch(err){ msgEl.innerHTML = `<div class="error-msg" style="display:block;">${escapeHtml(err.message||String(err))}</div>`; return; }
-
-  let ok = 0; const errors = [];
-  for(const row of rows){
-    const nomeRaw = row['Executivo'] || row['executivo'] || row['EXECUTIVO'] || '';
-    const nome = String(nomeRaw).trim();
-    if(!nome) continue;
-    const t = findExecutiveByName(nome);
-    if(!t){ errors.push('Executivo não encontrado: "'+nome+'" — cadastre a pessoa antes de importar.'); continue; }
-    const ciclo = String(row['Ciclo']||row['ciclo']||'').trim() || (latestSelf(t)?latestSelf(t).ciclo:defaultCiclo());
-    try{
-      const maId = await findOrCreateManagerAssessment(t, ciclo);
-      if(tipo==='acionamentos'){
-        await sb.from('manager_acionamentos').delete().eq('manager_assessment_id', maId);
-        const recs = [1,2,3].map(i=>({
-          manager_assessment_id: maId, mes_index: i,
-          mes: String(row['Mes'+i]||'').trim()||null,
-          quantidade: row['Qtd'+i]!==undefined && row['Qtd'+i]!=='' ? Number(row['Qtd'+i]) : null,
-          visitas: row['Visitas'+i]!==undefined && row['Visitas'+i]!=='' ? Number(row['Visitas'+i]) : null,
-          observacoes: String(row['Obs'+i]||'').trim()||null
-        })).filter(r=>r.mes||r.quantidade!==null||r.visitas!==null||r.observacoes);
-        if(recs.length) await sb.from('manager_acionamentos').insert(recs);
-      } else {
-        await sb.from('manager_consumo').delete().eq('manager_assessment_id', maId);
-        const recs = [1,2,3].map(i=>({
-          manager_assessment_id: maId, mes_index: i,
-          mes: String(row['Mes'+i]||'').trim()||null,
-          quantidade: row['Qtd'+i]!==undefined && row['Qtd'+i]!=='' ? Number(row['Qtd'+i]) : null,
-          observacoes: String(row['Obs'+i]||'').trim()||null
-        })).filter(r=>r.mes||r.quantidade!==null||r.observacoes);
-        if(recs.length) await sb.from('manager_consumo').insert(recs);
-      }
-      ok++;
-    }catch(err){ errors.push(nome+': '+(err.message||String(err))); }
-  }
-
-  await loadTeam(false);
-  currentView='importar'; setActiveTab(); renderImportador();
-  const resultEl = document.getElementById(msgId);
-  resultEl.innerHTML = `<div class="ok-msg" style="display:block;">${ok} registro(s) importado(s) com sucesso.</div>` +
-    (errors.length ? `<div class="error-msg" style="display:block;">${errors.length} com problema:<br>${errors.map(e=>escapeHtml(e)).join('<br>')}</div>` : '');
 }
 
 /* ------------------------------------------------------------------------
