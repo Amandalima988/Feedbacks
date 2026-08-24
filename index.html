@@ -986,6 +986,13 @@ let draft = null;         // rascunho editável da análise da gestora
 let selfDraft = null;     // rascunho editável da autoanálise (①③⑦ + nova mandala), agora corrigível pela gestora
 let mensalDraft = null;   // rascunho editável do histórico mensal contínuo (acionamentos_mensal / consumo_mensal)
 let currentView = 'equipe';
+let formDirty = false;    // true assim que a gestora mexe em algo no formulário aberto e ainda não salvou
+// a atualização automática de dados (a cada 90s, ou o botão "Atualizar dados") não pode reconstruir o
+// formulário no meio da edição — senão as marcações feitas mas ainda não salvas somem. Enquanto formDirty
+// for true, o refresh só atualiza a barra lateral, sem tocar no formulário da pessoa aberta.
+document.getElementById('main').addEventListener('click', ()=>{ if(activeExec) formDirty = true; }, true);
+document.getElementById('main').addEventListener('input', ()=>{ if(activeExec) formDirty = true; }, true);
+document.getElementById('main').addEventListener('change', ()=>{ if(activeExec) formDirty = true; }, true);
 
 async function checkSession(){
   const { data: { session } } = await sb.auth.getSession();
@@ -1089,7 +1096,15 @@ async function loadTeam(silent){
   // se já havia alguém selecionado, mantém a seleção e re-renderiza com os dados atualizados
   if(activeExec){
     const stillThere = teamData.find(t=>t.executive.id===activeExec.executive.id);
-    if(stillThere){ selectCollaborator(stillThere.executive.id); }
+    if(stillThere){
+      if(formDirty){
+        // a gestora está com marcações ainda não salvas nesta pessoa: só atualiza a
+        // referência interna (pra sidebar/badges), sem reconstruir o formulário aberto
+        activeExec = stillThere;
+      } else {
+        selectCollaborator(stillThere.executive.id);
+      }
+    }
     else { activeExec = null; }
   }
   if(currentView==='quadro') renderQuadroGerencial();
@@ -1275,6 +1290,7 @@ function selectCollaborator(execId){
   draft = draftFromManager(ma);
   selfDraft = selfDraftFromAssessment(activeSelf);
   mensalDraft = mensalDraftFromExec(activeExec);
+  formDirty = false;
   renderTimeline();
   renderPersonForm();
 }
@@ -1689,6 +1705,9 @@ async function salvarMensal(kind){
       const { error } = await sb.from(table).upsert(rows, 'executive_id,ano,mes_index');
       if(error) throw error;
     }
+    // não reseta formDirty aqui: se a gestora também tiver marcações não salvas em
+    // outra parte do formulário (ex.: ② ou a Nova Mandala), isso evita que o refresh
+    // que segue reconstrua o formulário e apague o que ainda não foi salvo ali
     await loadTeam(true);
     showToast('Histórico mensal salvo com sucesso.');
   } catch(err){
@@ -1927,6 +1946,7 @@ async function salvarAnalise(){
       ]);
     }
 
+    formDirty = false; // salvo com sucesso: já pode reconstruir o formulário com os dados atualizados
     await loadTeam();
     activeExec = teamData.find(t=>t.executive.id===activeExec.executive.id);
     activeSelf = activeExec.assessments.find(a=>a.id===activeSelf.id) || latestSelf(activeExec);
