@@ -1361,6 +1361,10 @@ function renderPersonForm(){
       <div class="block-sub">As notas atribuídas aqui geram a Nova Mandala de Competências oficial e definem o posicionamento do(a) colaborador(a).</div>
       <div class="block-body" id="managerDesempenhoBody"></div>
       <div style="padding:0 18px 18px;" id="mandalaPanelDesempenho"></div>
+      <div style="padding:0 18px 18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-salvar-analise" id="btnSalvarAnaliseTopo" type="button">Salvar avaliação da gestão</button>
+        <span class="ok-msg" id="saveMsgTopo" style="margin:0;">Avaliação salva com sucesso!</span>
+      </div>
     </section>
 
     <section class="block acionamentos">
@@ -1417,7 +1421,7 @@ function renderPersonForm(){
           <div class="field"><label>Recomendação de próximo cargo</label><input type="text" id="mRecomendacao" placeholder="ex: Analista Pleno"></div>
           <div class="field"><label>Previsão de feedback — data</label><input type="date" id="mDataFeedback"></div>
         </div>
-        <button class="btn btn-primary" id="btnSalvarAnalise" style="margin-top:16px;">Salvar análise da gestora</button>
+        <button class="btn btn-primary btn-salvar-analise" id="btnSalvarAnalise" style="margin-top:16px;">Salvar análise da gestora</button>
         <div class="ok-msg" id="saveMsg">Análise salva com sucesso!</div>
       </div>
     </section>
@@ -1587,10 +1591,10 @@ function renderMandalaPanelDesempenho(){
   const selfDesemp = {}; if(activeSelf) (activeSelf.self_assessment_desempenho||[]).forEach(c=>selfDesemp[c.comportamento]=c.nota);
   const svg = buildRadarSVG(draft.desempenho, selfDesemp, DESEMPENHO, 4);
   const sortedByScore = DESEMPENHO.map(c=>({name:c[0], score:draft.desempenho[c[0]]})).filter(c=>c.score!==null);
-  const maxScore = sortedByScore.length ? Math.max(...sortedByScore.map(c=>c.score)) : null;
-  const minScore = sortedByScore.length ? Math.min(...sortedByScore.map(c=>c.score)) : null;
-  const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=3);
-  const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
+  // ① pontos fortes = quadrante 4 (Referência) · ② dentro do esperado = quadrante 3 · ③ a desenvolver = quadrantes 1 e 2
+  const strengths = sortedByScore.filter(c=>c.score===4);
+  const withinExpected = sortedByScore.filter(c=>c.score===3);
+  const toDevelop = sortedByScore.filter(c=>c.score===1 || c.score===2);
   el.innerHTML = `
     <div class="mandala-sub-title">Mandala de Competências</div>
     <div class="radar-wrap">
@@ -1603,8 +1607,9 @@ function renderMandalaPanelDesempenho(){
         ${DESEMPENHO.map(c=>{ const s=draft.desempenho[c[0]]; return `<div class="stat-line"><span>${c[0]}</span><span class="stat-badge ${s?'s'+s:'na'}">${s?DESEMPENHO_LEVELS[s].label:'—'}</span></div>`; }).join('')}
       </div>
     </div>
-    <div class="insight-cols">
-      <div class="insight-box"><h4>Principais pontos fortes</h4>${strengths.length?`<ul>${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência com nota de destaque ainda.</div>'}</div>
+    <div class="insight-cols" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="insight-box"><h4>Principais pontos fortes</h4>${strengths.length?`<ul>${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência em Referência ainda.</div>'}</div>
+      <div class="insight-box"><h4>Dentro do esperado</h4>${withinExpected.length?`<ul>${withinExpected.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência avaliada como "Atende ao esperado" ainda.</div>'}</div>
       <div class="insight-box"><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul>${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<div class="insight-empty">Nenhuma competência crítica identificada ainda.</div>'}</div>
     </div>
     <div class="insight-box" style="margin-top:14px;"><h4>Prioridades para o PDI</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>Desenvolver <strong>${s.name}</strong> por meio de ações direcionadas, feedback contínuo e acompanhamento no próximo ciclo.</li>`).join('')}</ul>`:'<div class="insight-empty">Defina notas mais baixas em ao menos uma competência para gerar prioridades de PDI.</div>'}</div>
@@ -1856,10 +1861,13 @@ function renderMonthlyEvolutionChart(t){
 }
 
 // ---- salvar análise da gestora ----
+const SALVAR_ANALISE_BUTTONS = [
+  { id:'btnSalvarAnaliseTopo', label:'Salvar avaliação da gestão' },
+  { id:'btnSalvarAnalise', label:'Salvar análise da gestora' }
+];
 async function salvarAnalise(){
   if(!activeSelf){ alert('Este(a) colaborador(a) ainda não preencheu a autoanálise — não é possível vincular a análise da gestora a um ciclo.'); return; }
-  const btn = document.getElementById('btnSalvarAnalise');
-  btn.disabled = true; btn.textContent = 'Salvando...';
+  SALVAR_ANALISE_BUTTONS.forEach(spec=>{ const el = document.getElementById(spec.id); if(el){ el.disabled = true; el.textContent = 'Salvando...'; } });
   try{
     draft.statusCarreira = document.getElementById('mStatus').value;
     draft.recomendacao = document.getElementById('mRecomendacao').value;
@@ -1953,16 +1961,15 @@ async function salvarAnalise(){
     draft = draftFromManager(managerForSelf(activeExec, activeSelf.id));
     selfDraft = selfDraftFromAssessment(activeSelf);
     renderPersonForm();
-    document.getElementById('saveMsg').style.display='block';
+    ['saveMsg','saveMsgTopo'].forEach(id=>{ const el = document.getElementById(id); if(el) el.style.display='block'; });
   } catch(err){
     console.error(err);
     alert('Não foi possível salvar a análise. ' + (err.message||''));
   } finally {
-    const b = document.getElementById('btnSalvarAnalise');
-    if(b){ b.disabled=false; b.textContent='Salvar análise da gestora'; }
+    SALVAR_ANALISE_BUTTONS.forEach(spec=>{ const el = document.getElementById(spec.id); if(el){ el.disabled=false; el.textContent=spec.label; } });
   }
 }
-document.addEventListener('click', e=>{ if(e.target && e.target.id==='btnSalvarAnalise') salvarAnalise(); });
+document.addEventListener('click', e=>{ if(e.target && e.target.classList && e.target.classList.contains('btn-salvar-analise')) salvarAnalise(); });
 
 // ---- PDF / impressão ----
 function printPersonReport(){
@@ -1981,15 +1988,16 @@ function printPersonReport(){
   if(mgrStatDesemp.answered){
     const svg = buildRadarSVG(draft.desempenho, selfDesemp, DESEMPENHO, 4);
     const sortedByScore = DESEMPENHO.map(c=>({name:c[0], score:draft.desempenho[c[0]]})).filter(c=>c.score!==null);
-    const maxScore = Math.max(...sortedByScore.map(c=>c.score));
-    const minScore = Math.min(...sortedByScore.map(c=>c.score));
-    const strengths = sortedByScore.filter(c=>c.score===maxScore && maxScore>=3);
-    const toDevelop = sortedByScore.filter(c=>c.score===minScore && minScore<=2);
+    // ① pontos fortes = quadrante 4 (Referência) · ② dentro do esperado = quadrante 3 · ③ a desenvolver = quadrantes 1 e 2
+    const strengths = sortedByScore.filter(c=>c.score===4);
+    const withinExpected = sortedByScore.filter(c=>c.score===3);
+    const toDevelop = sortedByScore.filter(c=>c.score===1 || c.score===2);
     mandalaHtmlDesemp = `<div class="rp-mandala-top"><div class="rp-mandala-radar">${svg}</div>
       <div class="rp-mandala-stats"><div class="rp-stat-line"><span>Média geral</span><strong>${mgrStatDesemp.avg.toFixed(1)}/4</strong></div>
       <div class="rp-stat-line"><span>Competências avaliadas</span><strong>${mgrStatDesemp.answered}/${mgrStatDesemp.total}</strong></div>
       ${DESEMPENHO.map(c=>`<div class="rp-stat-line"><span>${c[0]}</span>${pillDesemp(draft.desempenho[c[0]])}</div>`).join('')}</div></div>
-      <div class="rp-insight-cols"><div><h4>Principais pontos fortes</h4>${strengths.length?`<ul class="rp-list">${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div>
+      <div class="rp-insight-cols" style="grid-template-columns:1fr 1fr 1fr;"><div><h4>Principais pontos fortes</h4>${strengths.length?`<ul class="rp-list">${strengths.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div>
+      <div><h4>Dentro do esperado</h4>${withinExpected.length?`<ul class="rp-list">${withinExpected.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div>
       <div><h4>Competências a desenvolver</h4>${toDevelop.length?`<ul class="rp-list">${toDevelop.map(s=>`<li>${s.name}</li>`).join('')}</ul>`:'<p class="rp-empty">—</p>'}</div></div>`;
   }
 
